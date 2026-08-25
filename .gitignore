@@ -1,0 +1,14 @@
+node_modules/
+.pnpm-store/
+**/.next/
+**/dist/
+**/coverage/
+*.tsbuildinfo
+backend/uploads/*
+!backend/uploads/.gitkeep
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+!**/.env.example
