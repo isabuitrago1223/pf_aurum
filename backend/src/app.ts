@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { categoryRouter } from './routes/category.routes.js';
 import { productRouter } from './routes/product.routes.js';
+import { occasionRouter } from './routes/occasion.routes.js';
 
 
 import { env } from './config/env.js';
@@ -35,3 +36,4 @@ app.use(
 app.use('/api/health', healthRouter);
 app.use('/api/categories', categoryRouter);
 app.use('/api/products', productRouter);
+app.use('/api/occasions', occasionRouter);
