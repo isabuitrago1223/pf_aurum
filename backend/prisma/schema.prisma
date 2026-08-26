@@ -1,0 +1,263 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLIENTE
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVO
+  SUSPENDIDO
+  PENDIENTE_VERIFICACION
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+enum OrderStatus {
+  PENDIENTE
+  EN_PREPARACION
+  EN_CAMINO
+  ENTREGADO
+  CANCELADO
+}
+
+enum DeliveryMethod {
+  DOMICILIO
+  TIENDA
+}
+
+enum PaymentMethod {
+  NEQUI
+  DAVIPLATA
+  PSE
+  TRANSFERENCIA_BANCARIA
+}
+
+enum PaymentStatus {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+  REEMBOLSADO
+}
+
+model User {
+  id                String        @id @default(cuid())
+  nombre            String        @db.VarChar(80)
+  apellido          String        @db.VarChar(80)
+  cedula            String?       @unique @db.VarChar(15)
+  telefono          String?       @db.VarChar(20)
+  direccion         String?       @db.VarChar(160)
+  barrio            String?       @db.VarChar(80)
+  ciudad            String?       @db.VarChar(80)
+  departamento      String?       @db.VarChar(80)
+  fechaNacimiento   DateTime?
+  email             String        @unique @db.VarChar(120)
+  passwordHash      String?       @db.VarChar(255)
+  googleId          String?       @unique @db.VarChar(191)
+  authProvider      AuthProvider  @default(LOCAL)
+  role              Role          @default(CLIENTE)
+  estado            AccountStatus @default(PENDIENTE_VERIFICACION)
+  emailVerifiedAt   DateTime?
+  acceptedTermsAt   DateTime?
+  acceptedPrivacyAt DateTime?
+  lastLoginAt       DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  orders            Order[]
+  auditLogs         AuditLog[]
+  resetTokens       PasswordResetToken[]
+
+  @@index([estado])
+  @@index([createdAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique @db.VarChar(255)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model Category {
+  id          String             @id @default(cuid())
+  nombre      String             @unique @db.VarChar(80)
+  slug        String             @unique @db.VarChar(100)
+  descripcion String             @db.Text
+  imagen      String             @db.VarChar(500)
+  activo      Boolean            @default(true)
+  orden       Int                @default(0)
+  products    Product[]
+  occasions   CategoryOccasion[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([activo, orden])
+}
+
+model Occasion {
+  id          String             @id @default(cuid())
+  nombre      String             @unique @db.VarChar(80)
+  slug        String             @unique @db.VarChar(100)
+  descripcion String?            @db.VarChar(255)
+  activo      Boolean            @default(true)
+  categories  CategoryOccasion[]
+  products    Product[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+model CategoryOccasion {
+  categoryId String
+  occasionId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  occasion   Occasion @relation(fields: [occasionId], references: [id], onDelete: Cascade)
+
+  @@id([categoryId, occasionId])
+  @@index([occasionId])
+}
+
+model Product {
+  id                      String         @id @default(cuid())
+  sku                     String         @unique @db.VarChar(60)
+  nombre                  String         @db.VarChar(150)
+  slug                    String         @unique @db.VarChar(180)
+  descripcion             String         @db.Text
+  precio                  Decimal        @db.Decimal(12, 2)
+  precioAnterior          Decimal?       @db.Decimal(12, 2)
+  costo                   Decimal?       @db.Decimal(12, 2)
+  stock                   Int            @default(0)
+  stockMinimo             Int            @default(0)
+  imagen                  String         @db.VarChar(500)
+  imagenAlt               String?        @db.VarChar(180)
+  tiempoEntrega           String         @db.VarChar(100)
+  pesoGramos              Int?
+  permitirPersonalizacion Boolean        @default(false)
+  opcionesPersonalizacion Json?
+  destacado               Boolean        @default(false)
+  activo                  Boolean        @default(true)
+  categoryId              String
+  occasionId              String?
+  category                Category       @relation(fields: [categoryId], references: [id])
+  occasion                Occasion?      @relation(fields: [occasionId], references: [id])
+  images                  ProductImage[]
+  orderItems              OrderItem[]
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  @@index([categoryId, activo])
+  @@index([occasionId])
+  @@index([destacado, activo])
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String   @db.VarChar(500)
+  alt       String?  @db.VarChar(180)
+  orden     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([productId, orden])
+}
+
+model Order {
+  id                      String         @id @default(cuid())
+  numeroPedido            String         @unique @db.VarChar(30)
+  userId                  String
+  user                    User           @relation(fields: [userId], references: [id])
+  estado                  OrderStatus    @default(PENDIENTE)
+  metodoEntrega           DeliveryMethod
+  nombreContacto          String         @db.VarChar(160)
+  cedulaContacto          String?        @db.VarChar(15)
+  emailContacto           String         @db.VarChar(120)
+  telefonoContacto        String         @db.VarChar(20)
+  direccionEntrega        String?        @db.VarChar(160)
+  barrioEntrega           String?        @db.VarChar(80)
+  ciudadEntrega           String?        @db.VarChar(80)
+  departamentoEntrega     String?        @db.VarChar(80)
+  notasEntrega            String?        @db.VarChar(500)
+  direccionRecogida       String?        @db.VarChar(160)
+  fechaRecogida           DateTime?
+  horaRecogida            String?        @db.VarChar(10)
+  costoEnvio              Decimal        @db.Decimal(12, 2)
+  subtotal                Decimal        @db.Decimal(12, 2)
+  descuento               Decimal        @default(0) @db.Decimal(12, 2)
+  total                   Decimal        @db.Decimal(12, 2)
+  fechaEstimadaEntrega    DateTime?
+  enlaceRastreo           String?        @db.VarChar(500)
+  motivoCancelacion       String?        @db.VarChar(500)
+  canceladoAt             DateTime?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  items                   OrderItem[]
+  payments                Payment[]
+
+  @@index([userId, createdAt])
+  @@index([estado, createdAt])
+}
+
+model OrderItem {
+  id                  String   @id @default(cuid())
+  orderId             String
+  order               Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId           String
+  product             Product  @relation(fields: [productId], references: [id])
+  nombreProducto      String   @db.VarChar(150)
+  imagenProducto      String?  @db.VarChar(500)
+  cantidad            Int
+  precioUnitario      Decimal  @db.Decimal(12, 2)
+  descuentoUnitario   Decimal  @default(0) @db.Decimal(12, 2)
+  personalizacion     Json?
+  createdAt           DateTime @default(now())
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Payment {
+  id                    String        @id @default(cuid())
+  orderId               String
+  order                 Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  metodo                PaymentMethod
+  estado                PaymentStatus @default(PENDIENTE)
+  monto                 Decimal       @db.Decimal(12, 2)
+  referencia            String?       @unique @db.VarChar(120)
+  proveedorTransaccion  String?       @db.VarChar(120)
+  respuestaPasarela     Json?
+  pagadoAt              DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  @@index([orderId, estado])
+  @@index([estado, createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  evento    String   @db.VarChar(120)
+  detalles  String   @db.Text
+  ip        String?  @db.VarChar(45)
+  userAgent String?  @db.VarChar(500)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([evento, createdAt])
+}
