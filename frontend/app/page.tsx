@@ -1,35 +1,10 @@
+import Header from "../components/Header";
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#fffaf7] text-[#2f2a27]">
-
       {/* ENCABEZADO */}
-      <header className="border-b border-[#eadfd8] bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-          <div>
-            <h1 className="text-2xl font-bold tracking-wide">
-              Aurum
-            </h1>
-
-            <p className="text-sm text-[#7a6f69]">
-              Decoraciones y detalles
-            </p>
-          </div>
-
-          <nav className="flex gap-6 text-sm font-medium">
-            <a href="#inicio" className="hover:opacity-70">
-              Inicio
-            </a>
-
-            <a href="#categorias" className="hover:opacity-70">
-              Categorías
-            </a>
-
-            <a href="#productos" className="hover:opacity-70">
-              Productos
-            </a>
-          </nav>
-        </div>
-      </header>
+      <Header />
 
       {/* SECCIÓN PRINCIPAL */}
       <section
@@ -68,13 +43,11 @@ export default function Home() {
       {/* CATEGORÍAS */}
       <section id="categorias" className="bg-white py-16">
         <div className="mx-auto max-w-6xl px-6">
-
           <h2 className="text-center text-3xl font-bold">
             Nuestras categorías
           </h2>
 
           <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-
             {["Anchetas", "Desayunos", "Ramos", "Regalos"].map(
               (categoria) => (
                 <article
@@ -89,7 +62,6 @@ export default function Home() {
                 </article>
               )
             )}
-
           </div>
         </div>
       </section>
@@ -97,13 +69,11 @@ export default function Home() {
       {/* PRODUCTOS DESTACADOS */}
       <section id="productos" className="py-16">
         <div className="mx-auto max-w-6xl px-6">
-
           <h2 className="text-center text-3xl font-bold">
             Productos destacados
           </h2>
 
           <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-
             {[1, 2, 3].map((producto) => (
               <article
                 key={producto}
@@ -126,7 +96,6 @@ export default function Home() {
                 </div>
               </article>
             ))}
-
           </div>
         </div>
       </section>
@@ -135,7 +104,6 @@ export default function Home() {
       <footer className="border-t border-[#eadfd8] bg-white py-8 text-center text-sm text-[#7a6f69]">
         © 2026 Aurum Decoraciones
       </footer>
-
     </main>
   );
 }
