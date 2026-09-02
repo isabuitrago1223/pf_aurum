@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import {
   createProduct,
+  getAdminProducts,
   getProductBySlug,
   getProducts,
   updateProduct,
@@ -15,8 +16,10 @@ import {
 
 export const productRouter = Router();
 
+// Obtener productos activos para el catálogo público
 productRouter.get('/', getProducts);
 
+// Crear producto - solo ADMIN
 productRouter.post(
   '/',
   requireAuth,
@@ -24,6 +27,7 @@ productRouter.post(
   createProduct
 );
 
+// Actualizar producto - solo ADMIN
 productRouter.put(
   '/:id',
   requireAuth,
@@ -31,6 +35,7 @@ productRouter.put(
   updateProduct
 );
 
+// Activar o desactivar producto - solo ADMIN
 productRouter.patch(
   '/:id/status',
   requireAuth,
@@ -38,4 +43,14 @@ productRouter.patch(
   updateProductStatus
 );
 
+// Obtener todos los productos, activos e inactivos - solo ADMIN
+productRouter.get(
+  '/admin',
+  requireAuth,
+  requireRole('ADMIN'),
+  getAdminProducts
+);
+
+// Obtener detalle público de un producto por slug
+// Esta ruta debe permanecer después de /admin
 productRouter.get('/:slug', getProductBySlug);
