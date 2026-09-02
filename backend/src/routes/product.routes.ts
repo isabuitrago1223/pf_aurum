@@ -3,7 +3,8 @@ import { Router } from 'express';
 import {
   createProduct,
   getProductBySlug,
-  getProducts
+  getProducts,
+  updateProduct
 } from '../controllers/product.controller.js';
 
 import {
@@ -22,5 +23,11 @@ productRouter.post(
   createProduct
 );
 
-productRouter.get('/:slug', getProductBySlug);
+productRouter.put(
+  '/:id',
+  requireAuth,
+  requireRole('ADMIN'),
+  updateProduct
+);
 
+productRouter.get('/:slug', getProductBySlug);

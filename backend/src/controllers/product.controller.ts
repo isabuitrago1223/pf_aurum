@@ -222,3 +222,106 @@ export async function createProduct(req: Request, res: Response) {
     product
   });
 }
+
+const updateProductSchema = createProductSchema.partial();
+
+export async function updateProduct(req: Request, res: Response) {
+  const idParam = req.params.id;
+
+  const id = Array.isArray(idParam)
+    ? idParam[0]
+    : idParam;
+
+  if (!id) {
+    return res.status(400).json({
+      message: 'El id del producto es requerido.'
+    });
+  }
+
+  const result = updateProductSchema.safeParse(req.body);
+
+  if (!result.success) {
+    return res.status(400).json({
+      message: 'Datos del producto inválidos.',
+      errors: result.error.flatten()
+    });
+  }
+
+  const existingProduct = await prisma.product.findUnique({
+    where: {
+      id
+    }
+  });
+
+  if (!existingProduct) {
+    return res.status(404).json({
+      message: 'Producto no encontrado.'
+    });
+  }
+
+  const data = result.data;
+
+  if (data.categoryId) {
+    const category = await prisma.category.findUnique({
+      where: {
+        id: data.categoryId
+      }
+    });
+
+    if (!category) {
+      return res.status(404).json({
+        message: 'Categoría no encontrada.'
+      });
+    }
+  }
+
+  if (data.occasionId) {
+    const occasion = await prisma.occasion.findUnique({
+      where: {
+        id: data.occasionId
+      }
+    });
+
+    if (!occasion) {
+      return res.status(404).json({
+        message: 'Ocasión no encontrada.'
+      });
+    }
+  }
+
+  if (data.sku || data.slug) {
+    const duplicateProduct = await prisma.product.findFirst({
+      where: {
+        id: {
+          not: id
+        },
+        OR: [
+          ...(data.sku ? [{ sku: data.sku }] : []),
+          ...(data.slug ? [{ slug: data.slug }] : [])
+        ]
+      }
+    });
+
+    if (duplicateProduct) {
+      return res.status(409).json({
+        message: 'Ya existe otro producto con ese SKU o slug.'
+      });
+    }
+  }
+
+  const product = await prisma.product.update({
+    where: {
+      id
+    },
+    data,
+    include: {
+      category: true,
+      occasion: true
+    }
+  });
+
+  return res.json({
+    message: 'Producto actualizado correctamente.',
+    product
+  });
+}
