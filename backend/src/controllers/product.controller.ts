@@ -325,3 +325,56 @@ export async function updateProduct(req: Request, res: Response) {
     product
   });
 }
+
+export async function updateProductStatus(req: Request, res: Response) {
+  const idParam = req.params.id;
+
+  const id = Array.isArray(idParam)
+    ? idParam[0]
+    : idParam;
+
+  if (!id) {
+    return res.status(400).json({
+      message: 'El id del producto es requerido.'
+    });
+  }
+
+  const result = z.object({
+    activo: z.boolean()
+  }).safeParse(req.body);
+
+  if (!result.success) {
+    return res.status(400).json({
+      message: 'Estado del producto inválido.',
+      errors: result.error.flatten()
+    });
+  }
+
+  const existingProduct = await prisma.product.findUnique({
+    where: {
+      id
+    }
+  });
+
+  if (!existingProduct) {
+    return res.status(404).json({
+      message: 'Producto no encontrado.'
+    });
+  }
+
+  const product = await prisma.product.update({
+    where: {
+      id
+    },
+    data: {
+      activo: result.data.activo
+    }
+  });
+
+  return res.json({
+    message: result.data.activo
+      ? 'Producto activado correctamente.'
+      : 'Producto desactivado correctamente.',
+    product
+  });
+}
