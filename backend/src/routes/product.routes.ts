@@ -4,7 +4,8 @@ import {
   createProduct,
   getProductBySlug,
   getProducts,
-  updateProduct
+  updateProduct,
+  updateProductStatus
 } from '../controllers/product.controller.js';
 
 import {
@@ -28,6 +29,13 @@ productRouter.put(
   requireAuth,
   requireRole('ADMIN'),
   updateProduct
+);
+
+productRouter.patch(
+  '/:id/status',
+  requireAuth,
+  requireRole('ADMIN'),
+  updateProductStatus
 );
 
 productRouter.get('/:slug', getProductBySlug);
