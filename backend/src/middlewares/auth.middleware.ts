@@ -20,7 +20,7 @@ export function requireAuth(
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
 
   if (!token) {
-    return next(new AppError(401, 'Autenticación requerida.'));
+    return next(new AppError(401, 'Autenticacion requerida.'));
   }
 
   try {
@@ -36,7 +36,9 @@ export function requireAuth(
 
     next();
   } catch {
-    next(new AppError(401, 'Sesión inválida o expirada.'));
+    return next(
+      new AppError(401, 'Sesion invalida o expirada.')
+    );
   }
 }
 
@@ -48,7 +50,7 @@ export function requireRole(...roles: Array<'CLIENTE' | 'ADMIN'>) {
   ) => {
     if (!req.auth || !roles.includes(req.auth.role)) {
       return next(
-        new AppError(403, 'No tienes permisos para esta acción.')
+        new AppError(403, 'No tienes permisos para esta accion.')
       );
     }
 
