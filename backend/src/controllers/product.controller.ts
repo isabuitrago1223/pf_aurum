@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { Request, Response } from 'express';
 
 import { prisma } from '../config/prisma.js';
@@ -112,4 +113,112 @@ export async function getProductBySlug(req: Request, res: Response) {
   }
 
   return res.json({ product });
+}
+const createProductSchema = z.object({
+  sku: z.string().min(1).max(60),
+  nombre: z.string().min(1).max(150),
+  slug: z.string().min(1).max(180),
+  descripcion: z.string().min(1),
+  precio: z.coerce.number().positive(),
+  precioAnterior: z.coerce.number().positive().optional(),
+  costo: z.coerce.number().positive().optional(),
+  stock: z.coerce.number().int().min(0).default(0),
+  stockMinimo: z.coerce.number().int().min(0).default(0),
+  imagen: z.string().min(1).max(500),
+  imagenAlt: z.string().max(180).optional(),
+  tiempoEntrega: z.string().min(1).max(100),
+  pesoGramos: z.coerce.number().int().positive().optional(),
+  permitirPersonalizacion: z.boolean().default(false),
+  opcionesPersonalizacion: z.any().optional(),
+  destacado: z.boolean().default(false),
+  activo: z.boolean().default(true),
+  categoryId: z.string().min(1),
+  occasionId: z.string().min(1).optional()
+});
+
+export async function createProduct(req: Request, res: Response) {
+  const result = createProductSchema.safeParse(req.body);
+
+  if (!result.success) {
+    return res.status(400).json({
+      message: 'Datos del producto inválidos.',
+      errors: result.error.flatten()
+    });
+  }
+
+  const data = result.data;
+
+  const existingProduct = await prisma.product.findFirst({
+    where: {
+      OR: [
+        { sku: data.sku },
+        { slug: data.slug }
+      ]
+    }
+  });
+
+  if (existingProduct) {
+    return res.status(409).json({
+      message: 'Ya existe un producto con ese SKU o slug.'
+    });
+  }
+
+  const category = await prisma.category.findUnique({
+    where: {
+      id: data.categoryId
+    }
+  });
+
+  if (!category) {
+    return res.status(404).json({
+      message: 'Categoría no encontrada.'
+    });
+  }
+
+  if (data.occasionId) {
+    const occasion = await prisma.occasion.findUnique({
+      where: {
+        id: data.occasionId
+      }
+    });
+
+    if (!occasion) {
+      return res.status(404).json({
+        message: 'Ocasión no encontrada.'
+      });
+    }
+  }
+
+  const product = await prisma.product.create({
+    data: {
+      sku: data.sku,
+      nombre: data.nombre,
+      slug: data.slug,
+      descripcion: data.descripcion,
+      precio: data.precio,
+      precioAnterior: data.precioAnterior,
+      costo: data.costo,
+      stock: data.stock,
+      stockMinimo: data.stockMinimo,
+      imagen: data.imagen,
+      imagenAlt: data.imagenAlt,
+      tiempoEntrega: data.tiempoEntrega,
+      pesoGramos: data.pesoGramos,
+      permitirPersonalizacion: data.permitirPersonalizacion,
+      opcionesPersonalizacion: data.opcionesPersonalizacion,
+      destacado: data.destacado,
+      activo: data.activo,
+      categoryId: data.categoryId,
+      occasionId: data.occasionId
+    },
+    include: {
+      category: true,
+      occasion: true
+    }
+  });
+
+  return res.status(201).json({
+    message: 'Producto creado correctamente.',
+    product
+  });
 }
