@@ -42,7 +42,7 @@ export async function getProducts(_req: Request, res: Response) {
     }
   });
 
-  res.json({ products });
+  return res.json({ products });
 }
 
 export async function getProductBySlug(req: Request, res: Response) {
@@ -114,6 +114,7 @@ export async function getProductBySlug(req: Request, res: Response) {
 
   return res.json({ product });
 }
+
 const createProductSchema = z.object({
   sku: z.string().min(1).max(60),
   nombre: z.string().min(1).max(150),
@@ -376,5 +377,21 @@ export async function updateProductStatus(req: Request, res: Response) {
       ? 'Producto activado correctamente.'
       : 'Producto desactivado correctamente.',
     product
+  });
+}
+
+export async function getAdminProducts(_req: Request, res: Response) {
+  const products = await prisma.product.findMany({
+    orderBy: {
+      createdAt: 'desc'
+    },
+    include: {
+      category: true,
+      occasion: true
+    }
+  });
+
+  return res.json({
+    products
   });
 }
