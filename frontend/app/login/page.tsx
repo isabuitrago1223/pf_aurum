@@ -3,17 +3,59 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 
+type LoginResponse = {
+  token: string;
+  user: {
+    id: string;
+    nombre: string;
+    email: string;
+    role: string;
+  };
+};
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    console.log({
-      email,
-      password,
-    });
+    setError("");
+    setLoading(true);
+
+    try {
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+      const response = await fetch(`${apiUrl}/api/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+
+      if (!response.ok) {
+        setError("Correo o contraseña incorrectos.");
+        return;
+      }
+
+      const data: LoginResponse = await response.json();
+
+      localStorage.setItem("aurum_token", data.token);
+      localStorage.setItem("aurum_user", JSON.stringify(data.user));
+
+      window.location.href = "/";
+    } catch {
+      setError("No fue posible iniciar sesión en este momento.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -54,7 +96,8 @@ export default function LoginPage() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
-              className="w-full rounded-xl border border-[#d9cec7] px-4 py-3 outline-none transition focus:border-[#a2725e]"
+              disabled={loading}
+              className="w-full rounded-xl border border-[#d9cec7] px-4 py-3 outline-none transition focus:border-[#a2725e] disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
 
@@ -75,15 +118,23 @@ export default function LoginPage() {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
-              className="w-full rounded-xl border border-[#d9cec7] px-4 py-3 outline-none transition focus:border-[#a2725e]"
+              disabled={loading}
+              className="w-full rounded-xl border border-[#d9cec7] px-4 py-3 outline-none transition focus:border-[#a2725e] disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
 
+          {error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
           <button
             type="submit"
-            className="w-full rounded-full bg-[#2f2a27] px-6 py-3 font-semibold text-white transition hover:opacity-90"
+            disabled={loading}
+            className="w-full rounded-full bg-[#2f2a27] px-6 py-3 font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Iniciar sesión
+            {loading ? "Iniciando sesión..." : "Iniciar sesión"}
           </button>
         </form>
 
