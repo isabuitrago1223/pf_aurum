@@ -72,9 +72,9 @@ export default function OrderDetailPage() {
           return;
         }
 
-        const data: Order = await response.json();
+        const data: { order: Order } = await response.json();
 
-        setOrder(data);
+setOrder(data.order);
       } catch {
         setError("No fue posible conectar con el servidor.");
       } finally {
