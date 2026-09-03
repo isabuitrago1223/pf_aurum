@@ -1,6 +1,21 @@
+"use client";
+
 import Link from "next/link";
+import { FormEvent, useState } from "react";
 
 export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    console.log({
+      email,
+      password,
+    });
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#fffaf7] px-6 py-12 text-[#2f2a27]">
       <div className="w-full max-w-md rounded-3xl border border-[#eadfd8] bg-white p-8 shadow-sm">
@@ -18,7 +33,10 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <form className="mt-8 space-y-5">
+        <form
+          className="mt-8 space-y-5"
+          onSubmit={handleSubmit}
+        >
           <div>
             <label
               htmlFor="email"
@@ -33,6 +51,9 @@ export default function LoginPage() {
               type="email"
               autoComplete="email"
               placeholder="correo@ejemplo.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
               className="w-full rounded-xl border border-[#d9cec7] px-4 py-3 outline-none transition focus:border-[#a2725e]"
             />
           </div>
@@ -51,6 +72,9 @@ export default function LoginPage() {
               type="password"
               autoComplete="current-password"
               placeholder="Tu contraseña"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
               className="w-full rounded-xl border border-[#d9cec7] px-4 py-3 outline-none transition focus:border-[#a2725e]"
             />
           </div>
