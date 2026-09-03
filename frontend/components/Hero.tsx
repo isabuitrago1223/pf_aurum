@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Hero() {
   return (
     <section
@@ -18,12 +20,12 @@ export default function Hero() {
           celebrar cada ocasión.
         </p>
 
-        <a
-          href="#productos"
+        <Link
+          href="/productos"
           className="mt-8 inline-block rounded-full bg-[#2f2a27] px-7 py-3 font-semibold text-white transition hover:opacity-90"
         >
           Ver productos
-        </a>
+        </Link>
       </div>
 
       <div className="flex min-h-[350px] items-center justify-center rounded-3xl bg-[#eadfd8] p-10 text-center">
