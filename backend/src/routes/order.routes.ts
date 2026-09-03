@@ -3,7 +3,9 @@ import { Router } from 'express';
 import {
   createOrder,
   getMyOrderById,
-  listMyOrders
+  listAllOrders,
+  listMyOrders,
+  updateOrderStatus
 } from '../controllers/order.controller.js';
 import { asyncHandler } from '../middlewares/async-handler.middleware.js';
 import {
@@ -18,6 +20,20 @@ orderRouter.get(
   requireAuth,
   requireRole('CLIENTE'),
   asyncHandler(listMyOrders)
+);
+
+orderRouter.get(
+  '/admin',
+  requireAuth,
+  requireRole('ADMIN'),
+  asyncHandler(listAllOrders)
+);
+
+orderRouter.patch(
+  '/admin/:id/status',
+  requireAuth,
+  requireRole('ADMIN'),
+  asyncHandler(updateOrderStatus)
 );
 
 orderRouter.get(
