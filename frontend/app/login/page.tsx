@@ -138,15 +138,32 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <Link
-            href="/"
-            className="text-sm font-semibold text-[#a2725e] transition hover:opacity-70"
-          >
-            Volver al inicio
-          </Link>
-        </div>
+        <div className="mt-6 space-y-3 text-center text-sm">
+  <div>
+    <span className="text-[#7a6f69]">
+      ¿No tienes una cuenta?{" "}
+    </span>
+
+    <Link
+      href="/registro"
+      className="font-semibold text-[#a2725e] transition hover:opacity-70"
+    >
+      Crear cuenta
+    </Link>
+  </div>
+
+  <div>
+    <Link
+      href="/"
+      className="font-semibold text-[#a2725e] transition hover:opacity-70"
+    >
+      Volver al inicio
+    </Link>
+  </div>
+</div>
+
       </div>
     </main>
   );
 }
+
