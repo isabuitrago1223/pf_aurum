@@ -15,21 +15,25 @@ type ProductsResponse = {
 };
 
 async function getProducts(): Promise<Product[]> {
-  const apiUrl = process.env.API_URL ?? "http://localhost:4000";
+  try {
+    const apiUrl = process.env.API_URL ?? "http://localhost:4000";
 
-  const response = await fetch(`${apiUrl}/api/products`, {
-    cache: "no-store",
-  });
+    const response = await fetch(`${apiUrl}/api/products`, {
+      cache: "no-store",
+    });
 
-  if (!response.ok) {
-    throw new Error("No fue posible cargar los productos.");
+    if (!response.ok) {
+      return [];
+    }
+
+    const data: ProductsResponse = await response.json();
+
+    return data.products
+      .filter((product) => product.destacado)
+      .slice(0, 3);
+  } catch {
+    return [];
   }
-
-  const data: ProductsResponse = await response.json();
-
-  return data.products
-    .filter((product) => product.destacado)
-    .slice(0, 3);
 }
 
 export default async function Products() {
@@ -42,38 +46,46 @@ export default async function Products() {
           Productos destacados
         </h2>
 
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {products.map((product) => (
-            <article
-              key={product.id}
-              className="overflow-hidden rounded-2xl border border-[#eadfd8] bg-white"
-            >
-              <div className="h-56 overflow-hidden bg-[#eadfd8]">
-                {product.imagen && (
-                  <img
-                    src={product.imagen}
-                    alt={product.imagenAlt ?? product.nombre}
-                    className="h-full w-full object-cover"
-                  />
-                )}
-              </div>
+        {products.length === 0 ? (
+          <div className="mt-10 rounded-2xl border border-[#eadfd8] bg-white p-8 text-center">
+            <p className="text-[#7a6f69]">
+              No fue posible cargar los productos en este momento.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {products.map((product) => (
+              <article
+                key={product.id}
+                className="overflow-hidden rounded-2xl border border-[#eadfd8] bg-white"
+              >
+                <div className="h-56 overflow-hidden bg-[#eadfd8]">
+                  {product.imagen && (
+                    <img
+                      src={product.imagen}
+                      alt={product.imagenAlt ?? product.nombre}
+                      className="h-full w-full object-cover"
+                    />
+                  )}
+                </div>
 
-              <div className="p-6">
-                <p className="text-sm text-[#a2725e]">
-                  {product.category.nombre}
-                </p>
+                <div className="p-6">
+                  <p className="text-sm text-[#a2725e]">
+                    {product.category.nombre}
+                  </p>
 
-                <h3 className="mt-1 text-xl font-semibold">
-                  {product.nombre}
-                </h3>
+                  <h3 className="mt-1 text-xl font-semibold">
+                    {product.nombre}
+                  </h3>
 
-                <p className="mt-3 font-bold">
-                  ${Number(product.precio).toLocaleString("es-CO")}
-                </p>
-              </div>
-            </article>
-          ))}
-        </div>
+                  <p className="mt-3 font-bold">
+                    ${Number(product.precio).toLocaleString("es-CO")}
+                  </p>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
