@@ -77,12 +77,21 @@ export default function Header() {
               </button>
             </>
           ) : (
-            <Link
-              href="/login"
-              className="font-semibold text-[#a2725e] hover:opacity-70"
-            >
-              Iniciar sesión
-            </Link>
+            <>
+  <Link
+    href="/registro"
+    className="hover:opacity-70"
+  >
+    Crear cuenta
+  </Link>
+
+  <Link
+    href="/login"
+    className="font-semibold text-[#a2725e] hover:opacity-70"
+  >
+    Iniciar sesión
+  </Link>
+</>
           )}
         </nav>
       </div>
