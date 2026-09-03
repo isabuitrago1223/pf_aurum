@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Header() {
   return (
     <header className="border-b border-[#eadfd8] bg-white">
@@ -13,17 +15,24 @@ export default function Header() {
         </div>
 
         <nav className="flex gap-6 text-sm font-medium">
-          <a href="#inicio" className="hover:opacity-70">
+          <Link href="/" className="hover:opacity-70">
             Inicio
-          </a>
+          </Link>
 
-          <a href="#categorias" className="hover:opacity-70">
+          <Link href="/#categorias" className="hover:opacity-70">
             Categorías
-          </a>
+          </Link>
 
-          <a href="#productos" className="hover:opacity-70">
+          <Link href="/productos" className="hover:opacity-70">
             Productos
-          </a>
+          </Link>
+
+          <Link
+            href="/login"
+            className="font-semibold text-[#a2725e] hover:opacity-70"
+          >
+            Iniciar sesión
+          </Link>
         </nav>
       </div>
     </header>
