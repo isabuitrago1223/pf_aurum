@@ -177,12 +177,19 @@ export default function OrdersPage() {
                   </div>
                 </div>
 
-                <div className="mt-5 border-t border-[#eadfd8] pt-5">
-                  <p className="text-sm text-[#7a6f69]">
-                    {order.items.length} producto
-                    {order.items.length === 1 ? "" : "s"} en este pedido
-                  </p>
-                </div>
+                <div className="mt-5 flex flex-col justify-between gap-4 border-t border-[#eadfd8] pt-5 sm:flex-row sm:items-center">
+  <p className="text-sm text-[#7a6f69]">
+    {order.items.length} producto
+    {order.items.length === 1 ? "" : "s"} en este pedido
+  </p>
+
+  <Link
+    href={`/pedidos/${order.id}`}
+    className="text-sm font-semibold text-[#a2725e] transition hover:opacity-70"
+  >
+    Ver detalle →
+  </Link>
+</div>
               </article>
             ))}
           </div>
