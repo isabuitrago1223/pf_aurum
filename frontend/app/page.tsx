@@ -2,6 +2,7 @@ import Header from "../components/Header";
 import Hero from "../components/Hero";
 import Categories from "../components/Categories";
 import Products from "../components/Products";
+import Footer from "../components/Footer";
 
 export default function Home() {
   return (
@@ -19,9 +20,7 @@ export default function Home() {
       <Products />
 
       {/* PIE DE PAGINA */}
-      <footer className="border-t border-[#eadfd8] bg-white py-8 text-center text-sm text-[#7a6f69]">
-        © 2026 Aurum Decoraciones
-      </footer>
+      <Footer />
     </main>
   );
 }
