@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import {
   createOrder,
+  getMyOrderById,
   listMyOrders
 } from '../controllers/order.controller.js';
 import { asyncHandler } from '../middlewares/async-handler.middleware.js';
@@ -17,6 +18,13 @@ orderRouter.get(
   requireAuth,
   requireRole('CLIENTE'),
   asyncHandler(listMyOrders)
+);
+
+orderRouter.get(
+  '/:id',
+  requireAuth,
+  requireRole('CLIENTE'),
+  asyncHandler(getMyOrderById)
 );
 
 orderRouter.post(
