@@ -220,3 +220,35 @@ export async function listMyOrders(
     orders
   });
 }
+
+export async function getMyOrderById(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  if (!req.auth) {
+    throw new AppError(401, 'Autenticacion requerida.');
+  }
+
+  const orderId = String(req.params.id);
+  
+  const order = await prisma.order.findFirst({
+    where: {
+      id: orderId,
+      userId: req.auth.userId
+    },
+    include: {
+      items: true
+    }
+  });
+
+  if (!order) {
+    throw new AppError(
+      404,
+      'Pedido no encontrado.'
+    );
+  }
+
+  return res.status(200).json({
+    order
+  });
+}
