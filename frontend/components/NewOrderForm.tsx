@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { FormEvent, useState } from "react";
+
+type CreateOrderResponse = {
+  message: string;
+  order: {
+    id: string;
+    numeroPedido: string;
+  };
+};
 
 export default function NewOrderForm() {
   const searchParams = useSearchParams();
@@ -11,6 +19,139 @@ export default function NewOrderForm() {
   const [metodoEntrega, setMetodoEntrega] = useState<
     "DOMICILIO" | "TIENDA"
   >("DOMICILIO");
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setError("");
+
+    if (!productId) {
+      setError("Debes seleccionar un producto.");
+      return;
+    }
+
+    const token = localStorage.getItem("aurum_token");
+
+    if (!token) {
+      setError("Debes iniciar sesión para realizar un pedido.");
+      return;
+    }
+
+    const formData = new FormData(event.currentTarget);
+
+    const cantidad = Number(formData.get("cantidad"));
+
+    if (!Number.isInteger(cantidad) || cantidad < 1) {
+      setError("La cantidad debe ser mayor a cero.");
+      return;
+    }
+
+    const body = {
+      metodoEntrega,
+      nombreContacto: String(
+        formData.get("nombreContacto") ?? "",
+      ).trim(),
+      cedulaContacto:
+        String(formData.get("cedulaContacto") ?? "").trim() ||
+        undefined,
+      emailContacto: String(
+        formData.get("emailContacto") ?? "",
+      ).trim(),
+      telefonoContacto: String(
+        formData.get("telefonoContacto") ?? "",
+      ).trim(),
+      direccionEntrega:
+        metodoEntrega === "DOMICILIO"
+          ? String(
+              formData.get("direccionEntrega") ?? "",
+            ).trim()
+          : undefined,
+      barrioEntrega:
+        metodoEntrega === "DOMICILIO"
+          ? String(
+              formData.get("barrioEntrega") ?? "",
+            ).trim()
+          : undefined,
+      ciudadEntrega:
+        metodoEntrega === "DOMICILIO"
+          ? String(
+              formData.get("ciudadEntrega") ?? "",
+            ).trim()
+          : undefined,
+      departamentoEntrega:
+        metodoEntrega === "DOMICILIO"
+          ? String(
+              formData.get("departamentoEntrega") ?? "",
+            ).trim()
+          : undefined,
+      notasEntrega:
+        String(formData.get("notasEntrega") ?? "").trim() ||
+        undefined,
+      items: [
+        {
+          productId,
+          cantidad,
+        },
+      ],
+    };
+
+    try {
+      setLoading(true);
+
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ??
+        "http://localhost:4000";
+
+      const response = await fetch(`${apiUrl}/api/orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        setError(
+          "Tu sesión no es válida. Inicia sesión nuevamente.",
+        );
+        return;
+      }
+
+      if (response.status === 404) {
+        setError("El producto ya no está disponible.");
+        return;
+      }
+
+      if (response.status === 409) {
+        const data = await response.json();
+
+        setError(
+          data.message ??
+            "No hay suficiente stock para completar el pedido.",
+        );
+        return;
+      }
+
+      if (!response.ok) {
+        setError(
+          "No fue posible crear el pedido. Revisa los datos e intenta nuevamente.",
+        );
+        return;
+      }
+
+      const data: CreateOrderResponse = await response.json();
+
+      window.location.href = `/pedidos/${data.order.id}`;
+    } catch {
+      setError("No fue posible conectar con el servidor.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[#faf7f5] px-6 py-12">
@@ -39,7 +180,27 @@ export default function NewOrderForm() {
             </div>
           )}
 
-          <form className="mt-8 space-y-6">
+          {error && (
+            <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
+              <p className="text-sm text-red-700">
+                {error}
+              </p>
+
+              {error.includes("iniciar sesión") && (
+                <Link
+                  href="/login"
+                  className="mt-2 inline-block text-sm font-semibold text-[#a2725e]"
+                >
+                  Ir a iniciar sesión
+                </Link>
+              )}
+            </div>
+          )}
+
+          <form
+            onSubmit={handleSubmit}
+            className="mt-8 space-y-6"
+          >
             <div>
               <label
                 htmlFor="cantidad"
@@ -73,13 +234,20 @@ export default function NewOrderForm() {
                 value={metodoEntrega}
                 onChange={(event) =>
                   setMetodoEntrega(
-                    event.target.value as "DOMICILIO" | "TIENDA",
+                    event.target.value as
+                      | "DOMICILIO"
+                      | "TIENDA",
                   )
                 }
                 className="w-full rounded-lg border border-[#d8cbc4] px-4 py-3 outline-none focus:border-[#a2725e]"
               >
-                <option value="DOMICILIO">Domicilio</option>
-                <option value="TIENDA">Recoger en tienda</option>
+                <option value="DOMICILIO">
+                  Domicilio
+                </option>
+
+                <option value="TIENDA">
+                  Recoger en tienda
+                </option>
               </select>
             </div>
 
@@ -113,6 +281,7 @@ export default function NewOrderForm() {
                   id="cedulaContacto"
                   name="cedulaContacto"
                   type="text"
+                  maxLength={15}
                   className="w-full rounded-lg border border-[#d8cbc4] px-4 py-3 outline-none focus:border-[#a2725e]"
                 />
               </div>
@@ -146,6 +315,8 @@ export default function NewOrderForm() {
                   id="telefonoContacto"
                   name="telefonoContacto"
                   type="tel"
+                  minLength={7}
+                  maxLength={20}
                   required
                   className="w-full rounded-lg border border-[#d8cbc4] px-4 py-3 outline-none focus:border-[#a2725e]"
                 />
@@ -162,6 +333,7 @@ export default function NewOrderForm() {
                   name="direccionEntrega"
                   type="text"
                   placeholder="Dirección"
+                  maxLength={160}
                   required
                   className="w-full rounded-lg border border-[#d8cbc4] bg-white px-4 py-3 outline-none focus:border-[#a2725e]"
                 />
@@ -170,6 +342,7 @@ export default function NewOrderForm() {
                   name="barrioEntrega"
                   type="text"
                   placeholder="Barrio"
+                  maxLength={80}
                   required
                   className="w-full rounded-lg border border-[#d8cbc4] bg-white px-4 py-3 outline-none focus:border-[#a2725e]"
                 />
@@ -179,6 +352,7 @@ export default function NewOrderForm() {
                     name="ciudadEntrega"
                     type="text"
                     placeholder="Ciudad"
+                    maxLength={80}
                     required
                     className="w-full rounded-lg border border-[#d8cbc4] bg-white px-4 py-3 outline-none focus:border-[#a2725e]"
                   />
@@ -187,6 +361,7 @@ export default function NewOrderForm() {
                     name="departamentoEntrega"
                     type="text"
                     placeholder="Departamento"
+                    maxLength={80}
                     required
                     className="w-full rounded-lg border border-[#d8cbc4] bg-white px-4 py-3 outline-none focus:border-[#a2725e]"
                   />
@@ -212,11 +387,13 @@ export default function NewOrderForm() {
             </div>
 
             <button
-              type="button"
-              disabled={!productId}
+              type="submit"
+              disabled={!productId || loading}
               className="w-full rounded-lg bg-[#a2725e] px-5 py-3 font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Continuar pedido
+              {loading
+                ? "Creando pedido..."
+                : "Realizar pedido"}
             </button>
           </form>
         </div>
