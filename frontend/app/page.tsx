@@ -1,7 +1,10 @@
+import { Suspense } from "react";
+
 import Header from "../components/Header";
 import Hero from "../components/Hero";
 import Categories from "../components/Categories";
 import Products from "../components/Products";
+import ProductsLoading from "../components/ProductsLoading";
 import Footer from "../components/Footer";
 
 export default function Home() {
@@ -17,7 +20,9 @@ export default function Home() {
       <Categories />
 
       {/* PRODUCTOS DESTACADOS */}
-      <Products />
+      <Suspense fallback={<ProductsLoading />}>
+        <Products />
+      </Suspense>
 
       {/* PIE DE PAGINA */}
       <Footer />
