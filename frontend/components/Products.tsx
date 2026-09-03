@@ -15,7 +15,9 @@ type ProductsResponse = {
 };
 
 async function getProducts(): Promise<Product[]> {
-  const response = await fetch("http://localhost:4000/api/products", {
+  const apiUrl = process.env.API_URL ?? "http://localhost:4000";
+
+  const response = await fetch(`${apiUrl}/api/products`, {
     cache: "no-store",
   });
 
@@ -25,7 +27,9 @@ async function getProducts(): Promise<Product[]> {
 
   const data: ProductsResponse = await response.json();
 
-  return data.products.filter((product) => product.destacado).slice(0, 3);
+  return data.products
+    .filter((product) => product.destacado)
+    .slice(0, 3);
 }
 
 export default async function Products() {
