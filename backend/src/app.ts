@@ -12,6 +12,7 @@ import { categoryRouter } from './routes/category.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 import { occasionRouter } from './routes/occasion.routes.js';
 import { productRouter } from './routes/product.routes.js';
+import { orderRouter } from './routes/order.routes.js';
 
 export const app = express();
 
@@ -45,6 +46,8 @@ app.use('/api/categories', categoryRouter);
 app.use('/api/products', productRouter);
 
 app.use('/api/occasions', occasionRouter);
+
+app.use('/api/orders', orderRouter);
 
 app.use('/api/auth', authRouter);
 
