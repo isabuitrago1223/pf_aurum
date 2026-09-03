@@ -195,3 +195,28 @@ export async function createOrder(
     order
   });
 }
+
+export async function listMyOrders(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  if (!req.auth) {
+    throw new AppError(401, 'Autenticacion requerida.');
+  }
+
+  const orders = await prisma.order.findMany({
+    where: {
+      userId: req.auth.userId
+    },
+    orderBy: {
+      createdAt: 'desc'
+    },
+    include: {
+      items: true
+    }
+  });
+
+  return res.status(200).json({
+    orders
+  });
+}
