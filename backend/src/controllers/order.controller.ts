@@ -252,3 +252,74 @@ export async function getMyOrderById(
     order
   });
 }
+
+export async function listAllOrders(
+  _req: AuthenticatedRequest,
+  res: Response
+) {
+  const orders = await prisma.order.findMany({
+    orderBy: {
+      createdAt: 'desc'
+    },
+    include: {
+      items: true,
+      user: {
+        select: {
+          id: true,
+          nombre: true,
+          apellido: true,
+          email: true
+        }
+      }
+    }
+  });
+
+  return res.status(200).json({
+    orders
+  });
+}
+
+const updateOrderStatusSchema = z.object({
+  estado: z.enum([
+    'PENDIENTE',
+    'EN_PREPARACION',
+    'EN_CAMINO',
+    'ENTREGADO',
+    'CANCELADO'
+  ])
+});
+
+export async function updateOrderStatus(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  const orderId = String(req.params.id);
+  const data = updateOrderStatusSchema.parse(req.body);
+
+  const order = await prisma.order.findUnique({
+    where: {
+      id: orderId
+    }
+  });
+
+  if (!order) {
+    throw new AppError(
+      404,
+      'Pedido no encontrado.'
+    );
+  }
+
+  const updatedOrder = await prisma.order.update({
+    where: {
+      id: orderId
+    },
+    data: {
+      estado: data.estado
+    }
+  });
+
+  return res.status(200).json({
+    message: 'Estado del pedido actualizado correctamente.',
+    order: updatedOrder
+  });
+}
