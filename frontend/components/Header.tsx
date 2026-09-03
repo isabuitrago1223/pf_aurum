@@ -64,6 +64,15 @@ export default function Header() {
 
           {user ? (
             <>
+              {user.role === "CLIENTE" && (
+                <Link
+                  href="/pedidos"
+                  className="hover:opacity-70"
+                >
+                  Mis pedidos
+                </Link>
+              )}
+
               <span className="font-semibold text-[#a2725e]">
                 Hola, {user.nombre}
               </span>
@@ -78,20 +87,20 @@ export default function Header() {
             </>
           ) : (
             <>
-  <Link
-    href="/registro"
-    className="hover:opacity-70"
-  >
-    Crear cuenta
-  </Link>
+              <Link
+                href="/registro"
+                className="hover:opacity-70"
+              >
+                Crear cuenta
+              </Link>
 
-  <Link
-    href="/login"
-    className="font-semibold text-[#a2725e] hover:opacity-70"
-  >
-    Iniciar sesión
-  </Link>
-</>
+              <Link
+                href="/login"
+                className="font-semibold text-[#a2725e] hover:opacity-70"
+              >
+                Iniciar sesión
+              </Link>
+            </>
           )}
         </nav>
       </div>
