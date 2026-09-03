@@ -286,7 +286,16 @@ const updateOrderStatusSchema = z.object({
     'EN_CAMINO',
     'ENTREGADO',
     'CANCELADO'
-  ])
+  ]),
+  motivoCancelacion: z.string().trim().min(5).max(500).optional()
+}).superRefine((data, ctx) => {
+  if (data.estado === 'CANCELADO' && !data.motivoCancelacion) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['motivoCancelacion'],
+      message: 'El motivo de cancelacion es requerido.'
+    });
+  }
 });
 
 export async function updateOrderStatus(
@@ -299,6 +308,9 @@ export async function updateOrderStatus(
   const order = await prisma.order.findUnique({
     where: {
       id: orderId
+    },
+    include: {
+      items: true
     }
   });
 
@@ -309,17 +321,62 @@ export async function updateOrderStatus(
     );
   }
 
-  const updatedOrder = await prisma.order.update({
-    where: {
-      id: orderId
-    },
-    data: {
-      estado: data.estado
+  if (order.estado === 'CANCELADO') {
+    throw new AppError(
+      409,
+      'El pedido ya se encuentra cancelado.'
+    );
+  }
+
+  if (order.estado === 'ENTREGADO' && data.estado === 'CANCELADO') {
+    throw new AppError(
+      409,
+      'No es posible cancelar un pedido entregado.'
+    );
+  }
+
+  const updatedOrder = await prisma.$transaction(async (tx) => {
+    if (data.estado === 'CANCELADO') {
+      for (const item of order.items) {
+        await tx.product.update({
+          where: {
+            id: item.productId
+          },
+          data: {
+            stock: {
+              increment: item.cantidad
+            }
+          }
+        });
+      }
     }
+
+    return tx.order.update({
+      where: {
+        id: orderId
+      },
+      data: {
+        estado: data.estado,
+        motivoCancelacion:
+          data.estado === 'CANCELADO'
+            ? data.motivoCancelacion
+            : null,
+        canceladoAt:
+          data.estado === 'CANCELADO'
+            ? new Date()
+            : null
+      },
+      include: {
+        items: true
+      }
+    });
   });
 
   return res.status(200).json({
-    message: 'Estado del pedido actualizado correctamente.',
+    message:
+      data.estado === 'CANCELADO'
+        ? 'Pedido cancelado correctamente.'
+        : 'Estado del pedido actualizado correctamente.',
     order: updatedOrder
   });
 }
