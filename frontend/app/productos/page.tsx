@@ -1,3 +1,5 @@
+import ProductCatalog from "../../components/ProductCatalog";
+
 export default function ProductsPage() {
   return (
     <main className="min-h-screen bg-[#fffaf7] px-6 py-16 text-[#2f2a27]">
@@ -10,6 +12,8 @@ export default function ProductsPage() {
           Explora los detalles disponibles en Aurum Decoraciones y encuentra
           una opción especial para cada ocasión.
         </p>
+
+        <ProductCatalog />
       </div>
     </main>
   );
