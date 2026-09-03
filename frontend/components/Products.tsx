@@ -1,4 +1,36 @@
-export default function Products() {
+type Product = {
+  id: string;
+  nombre: string;
+  precio: string;
+  imagen: string | null;
+  imagenAlt: string | null;
+  destacado: boolean;
+  category: {
+    nombre: string;
+  };
+};
+
+type ProductsResponse = {
+  products: Product[];
+};
+
+async function getProducts(): Promise<Product[]> {
+  const response = await fetch("http://localhost:4000/api/products", {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("No fue posible cargar los productos.");
+  }
+
+  const data: ProductsResponse = await response.json();
+
+  return data.products.filter((product) => product.destacado).slice(0, 3);
+}
+
+export default async function Products() {
+  const products = await getProducts();
+
   return (
     <section id="productos" className="py-16">
       <div className="mx-auto max-w-6xl px-6">
@@ -7,24 +39,32 @@ export default function Products() {
         </h2>
 
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((producto) => (
+          {products.map((product) => (
             <article
-              key={producto}
+              key={product.id}
               className="overflow-hidden rounded-2xl border border-[#eadfd8] bg-white"
             >
-              <div className="h-56 bg-[#eadfd8]" />
+              <div className="h-56 overflow-hidden bg-[#eadfd8]">
+                {product.imagen && (
+                  <img
+                    src={product.imagen}
+                    alt={product.imagenAlt ?? product.nombre}
+                    className="h-full w-full object-cover"
+                  />
+                )}
+              </div>
 
               <div className="p-6">
                 <p className="text-sm text-[#a2725e]">
-                  Aurum
+                  {product.category.nombre}
                 </p>
 
                 <h3 className="mt-1 text-xl font-semibold">
-                  Producto destacado {producto}
+                  {product.nombre}
                 </h3>
 
                 <p className="mt-3 font-bold">
-                  $50.000
+                  ${Number(product.precio).toLocaleString("es-CO")}
                 </p>
               </div>
             </article>
