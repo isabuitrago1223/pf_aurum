@@ -60,9 +60,9 @@ export default function OrdersPage() {
           return;
         }
 
-        const data = await response.json();
+        const data: { orders: Order[] } = await response.json();
 
-        setOrders(data);
+setOrders(data.orders);
       } catch {
         setError("No fue posible conectar con el servidor.");
       } finally {

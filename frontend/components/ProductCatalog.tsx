@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 type Product = {
   id: string;
   nombre: string;
@@ -75,6 +77,13 @@ export default async function ProductCatalog() {
             <p className="mt-3 font-bold">
               ${Number(product.precio).toLocaleString("es-CO")}
             </p>
+
+            <Link
+              href={`/pedido/nuevo?productId=${product.id}`}
+              className="mt-5 inline-block rounded-lg bg-[#a2725e] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+            >
+              Comprar
+            </Link>
           </div>
         </article>
       ))}
