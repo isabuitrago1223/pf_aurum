@@ -1,6 +1,9 @@
 import { Router } from 'express';
 
-import { createOrder } from '../controllers/order.controller.js';
+import {
+  createOrder,
+  listMyOrders
+} from '../controllers/order.controller.js';
 import { asyncHandler } from '../middlewares/async-handler.middleware.js';
 import {
   requireAuth,
@@ -8,6 +11,13 @@ import {
 } from '../middlewares/auth.middleware.js';
 
 export const orderRouter = Router();
+
+orderRouter.get(
+  '/my-orders',
+  requireAuth,
+  requireRole('CLIENTE'),
+  asyncHandler(listMyOrders)
+);
 
 orderRouter.post(
   '/',
