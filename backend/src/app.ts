@@ -11,9 +11,10 @@ import { authRouter } from './routes/auth.routes.js';
 import { categoryRouter } from './routes/category.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 import { occasionRouter } from './routes/occasion.routes.js';
-import { productRouter } from './routes/product.routes.js';
 import { orderRouter } from './routes/order.routes.js';
 import { paymentRouter } from './routes/payment.routes.js';
+import { productRouter } from './routes/product.routes.js';
+import { uploadRouter } from './routes/upload.routes.js';
 
 export const app = express();
 
@@ -51,6 +52,8 @@ app.use('/api/occasions', occasionRouter);
 app.use('/api/orders', orderRouter);
 
 app.use('/api/payments', paymentRouter);
+
+app.use('/api/uploads', uploadRouter);
 
 app.use('/api/auth', authRouter);
 
