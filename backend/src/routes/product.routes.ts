@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import {
+  addProductImage,
   createProduct,
   getAdminProducts,
   getProductBySlug,
@@ -15,7 +16,14 @@ import {
 } from '../middlewares/auth.middleware.js';
 
 export const productRouter = Router();
+// Agregar imagen a la galeria de un producto - solo ADMIN
 
+productRouter.post(
+  '/:id/images',
+  requireAuth,
+  requireRole('ADMIN'),
+  addProductImage
+);
 // Obtener productos activos para el catálogo público
 productRouter.get('/', getProducts);
 
