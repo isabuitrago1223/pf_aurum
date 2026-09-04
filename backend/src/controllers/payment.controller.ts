@@ -15,6 +15,15 @@ const createPaymentSchema = z.object({
   ])
 });
 
+const updatePaymentStatusSchema = z.object({
+  estado: z.enum([
+    'PENDIENTE',
+    'APROBADO',
+    'RECHAZADO',
+    'REEMBOLSADO'
+  ])
+});
+
 export async function createPayment(
   req: AuthenticatedRequest,
   res: Response
@@ -59,6 +68,77 @@ export async function createPayment(
 
   return res.status(201).json({
     message: 'Pago registrado correctamente.',
+    payment
+  });
+}
+
+export async function listAdminPayments(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  const payments = await prisma.payment.findMany({
+    orderBy: {
+      createdAt: 'desc'
+    },
+    include: {
+      order: {
+        select: {
+          id: true,
+          numeroPedido: true,
+          estado: true,
+          total: true,
+          user: {
+            select: {
+              id: true,
+              nombre: true,
+              apellido: true,
+              email: true
+            }
+          }
+        }
+      }
+    }
+  });
+
+  return res.status(200).json({
+    payments
+  });
+}
+
+export async function updateAdminPaymentStatus(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  const paymentId = z.string().min(1).parse(req.params.id);
+  const data = updatePaymentStatusSchema.parse(req.body);
+
+  const existingPayment = await prisma.payment.findUnique({
+    where: {
+      id: paymentId
+    }
+  });
+
+  if (!existingPayment) {
+    throw new AppError(
+      404,
+      'Pago no encontrado.'
+    );
+  }
+
+  const payment = await prisma.payment.update({
+    where: {
+      id: paymentId
+    },
+    data: {
+      estado: data.estado,
+      ...(data.estado === 'APROBADO' && !existingPayment.pagadoAt
+        ? { pagadoAt: new Date() }
+        : {})
+    }
+  });
+
+  return res.status(200).json({
+    message: 'Estado del pago actualizado correctamente.',
     payment
   });
 }
