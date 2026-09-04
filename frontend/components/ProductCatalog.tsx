@@ -2,6 +2,7 @@ import Link from "next/link";
 
 type Product = {
   id: string;
+  slug: string;
   nombre: string;
   precio: string;
   imagen: string | null;
@@ -17,7 +18,8 @@ type ProductsResponse = {
 
 async function getProducts(): Promise<Product[]> {
   try {
-    const apiUrl = process.env.API_URL ?? "http://localhost:4000";
+    const apiUrl =
+      process.env.API_URL ?? "http://localhost:4000";
 
     const response = await fetch(`${apiUrl}/api/products`, {
       cache: "no-store",
@@ -78,12 +80,21 @@ export default async function ProductCatalog() {
               ${Number(product.precio).toLocaleString("es-CO")}
             </p>
 
-            <Link
-              href={`/pedido/nuevo?productId=${product.id}`}
-              className="mt-5 inline-block rounded-lg bg-[#a2725e] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
-            >
-              Comprar
-            </Link>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href={`/productos/${product.slug}`}
+                className="inline-block rounded-lg border border-[#a2725e] px-5 py-3 text-sm font-semibold text-[#a2725e] transition hover:bg-[#fff4ef]"
+              >
+                Ver detalles
+              </Link>
+
+              <Link
+                href={`/pedido/nuevo?productId=${product.id}`}
+                className="inline-block rounded-lg bg-[#a2725e] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+              >
+                Comprar
+              </Link>
+            </div>
           </div>
         </article>
       ))}
