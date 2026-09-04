@@ -25,6 +25,12 @@ type Order = {
   items: OrderItem[];
 };
 
+type PaymentMethod =
+  | "NEQUI"
+  | "DAVIPLATA"
+  | "PSE"
+  | "TRANSFERENCIA_BANCARIA";
+
 export default function OrderDetailPage() {
   const params = useParams<{ id: string }>();
   const orderId = params.id;
@@ -32,6 +38,12 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentMethod>("NEQUI");
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState("");
+  const [paymentError, setPaymentError] = useState("");
 
   useEffect(() => {
     async function loadOrder() {
@@ -85,6 +97,56 @@ setOrder(data.order);
     }
   }, [orderId]);
 
+  async function handlePayment() {
+    if (!order) {
+      return;
+    }
+
+    const token = localStorage.getItem("aurum_token");
+
+    if (!token) {
+      setPaymentError("Debes iniciar sesión para registrar el pago.");
+      return;
+    }
+
+    setPaymentLoading(true);
+    setPaymentMessage("");
+    setPaymentError("");
+
+    try {
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+      const response = await fetch(`${apiUrl}/api/payments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          orderId: order.id,
+          metodo: paymentMethod,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setPaymentError(
+          data?.message ?? "No fue posible registrar el pago.",
+        );
+        return;
+      }
+
+      setPaymentMessage(
+        "Pago registrado correctamente. Estado inicial: PENDIENTE.",
+      );
+    } catch {
+      setPaymentError("No fue posible conectar con el servidor.");
+    } finally {
+      setPaymentLoading(false);
+    }
+  }
   function formatPrice(value: number) {
     return new Intl.NumberFormat("es-CO", {
       style: "currency",
@@ -109,7 +171,7 @@ setOrder(data.order);
             href="/pedidos"
             className="text-sm font-semibold text-[#a2725e] transition hover:opacity-70"
           >
-            ← Volver a mis pedidos
+← Volver a mis pedidos
           </Link>
 
           <h1 className="mt-4 text-3xl font-bold">
@@ -215,6 +277,71 @@ setOrder(data.order);
                 <span>{formatPrice(order.total)}</span>
               </div>
             </div>
+            {order.estado !== "CANCELADO" && (
+              <div className="mt-8 border-t border-[#eadfd8] pt-6">
+                <h3 className="text-lg font-bold">Registrar pago</h3>
+
+                <p className="mt-2 text-sm text-[#7a6f69]">
+                  Selecciona el método de pago. El registro se creará inicialmente en estado PENDIENTE.
+                </p>
+
+                <div className="mt-4">
+                  <label
+                    htmlFor="paymentMethod"
+                    className="block text-sm font-semibold"
+                  >
+                    Método de pago
+                  </label>
+
+                  <select
+                    id="paymentMethod"
+                    value={paymentMethod}
+                    onChange={(event) =>
+                      setPaymentMethod(event.target.value as PaymentMethod)
+                    }
+                    className="mt-2 w-full rounded-xl border border-[#eadfd8] bg-white px-4 py-3 outline-none"
+                  >
+                    <option value="NEQUI">Nequi</option>
+                    <option value="DAVIPLATA">Daviplata</option>
+                    <option value="PSE">PSE</option>
+                    <option value="TRANSFERENCIA_BANCARIA">
+                      Transferencia bancaria
+                    </option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handlePayment}
+                  disabled={paymentLoading}
+                  className="mt-4 rounded-xl bg-[#a2725e] px-5 py-3 font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {paymentLoading
+                    ? "Registrando pago..."
+                    : "Registrar pago"}
+                </button>
+
+                {paymentMessage && (
+                  <p className="mt-4 text-sm font-semibold text-green-700">
+                    {paymentMessage}
+                  </p>
+                )}
+
+                {paymentError && (
+                  <p className="mt-4 text-sm font-semibold text-red-700">
+                    {paymentError}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {order.estado === "CANCELADO" && (
+              <div className="mt-8 border-t border-[#eadfd8] pt-6">
+                <p className="text-sm font-semibold text-[#a2725e]">
+                  Este pedido está cancelado y no permite registrar pagos.
+                </p>
+              </div>
+            )}
           </section>
         )}
       </div>
