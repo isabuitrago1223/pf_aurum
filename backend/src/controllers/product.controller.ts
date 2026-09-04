@@ -125,9 +125,7 @@ const createProductSchema = z.object({
   costo: z.coerce.number().positive().optional(),
   stock: z.coerce.number().int().min(0).default(0),
   stockMinimo: z.coerce.number().int().min(0).default(0),
-
   imagen: z.string().url().max(500),
-
   imagenAlt: z.string().max(180).optional(),
   tiempoEntrega: z.string().min(1).max(100),
   pesoGramos: z.coerce.number().int().positive().optional(),
@@ -403,5 +401,66 @@ export async function getAdminProducts(
 
   return res.json({
     products
+  });
+}
+
+const createProductImageSchema = z.object({
+  url: z.string().url().max(500),
+  alt: z.string().max(180).optional(),
+  orden: z.coerce.number().int().min(0).default(0)
+});
+
+export async function addProductImage(
+  req: Request,
+  res: Response
+) {
+  const idParam = req.params.id;
+
+  const productId = Array.isArray(idParam)
+    ? idParam[0]
+    : idParam;
+
+  if (!productId) {
+    return res.status(400).json({
+      message: 'El id del producto es requerido.'
+    });
+  }
+
+  const result = createProductImageSchema.safeParse(req.body);
+
+  if (!result.success) {
+    return res.status(400).json({
+      message: 'Datos de la imagen inválidos.',
+      errors: result.error.flatten()
+    });
+  }
+
+  const product = await prisma.product.findUnique({
+    where: {
+      id: productId
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (!product) {
+    return res.status(404).json({
+      message: 'Producto no encontrado.'
+    });
+  }
+
+  const image = await prisma.productImage.create({
+    data: {
+      productId,
+      url: result.data.url,
+      alt: result.data.alt,
+      orden: result.data.orden
+    }
+  });
+
+  return res.status(201).json({
+    message: 'Imagen agregada al producto correctamente.',
+    image
   });
 }
