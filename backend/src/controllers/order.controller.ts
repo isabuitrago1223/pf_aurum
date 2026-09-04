@@ -335,6 +335,23 @@ export async function updateOrderStatus(
     );
   }
 
+  const validTransitions: Record<string, string[]> = {
+    PENDIENTE: ['EN_PREPARACION', 'CANCELADO'],
+    EN_PREPARACION: ['EN_CAMINO', 'CANCELADO'],
+    EN_CAMINO: ['ENTREGADO', 'CANCELADO'],
+    ENTREGADO: [],
+    CANCELADO: []
+  };
+
+  const allowedNextStates = validTransitions[order.estado] ?? [];
+
+  if (!allowedNextStates.includes(data.estado)) {
+    throw new AppError(
+      409,
+      `No es posible cambiar el pedido de ${order.estado} a ${data.estado}.`
+    );
+  }
+
   const updatedOrder = await prisma.$transaction(async (tx) => {
     if (data.estado === 'CANCELADO') {
       for (const item of order.items) {
