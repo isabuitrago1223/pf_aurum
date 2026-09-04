@@ -58,6 +58,22 @@ export async function createPayment(
     );
   }
 
+  const existingPayment = await prisma.payment.findFirst({
+    where: {
+      orderId: order.id,
+      estado: {
+        in: ['PENDIENTE', 'APROBADO']
+      }
+    }
+  });
+
+  if (existingPayment) {
+    throw new AppError(
+      409,
+      'Ya existe un pago pendiente o aprobado para este pedido.'
+    );
+  }
+
   const payment = await prisma.payment.create({
     data: {
       orderId: order.id,
