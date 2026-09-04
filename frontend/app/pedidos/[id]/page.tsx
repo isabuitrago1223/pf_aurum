@@ -6,13 +6,11 @@ import { useEffect, useState } from "react";
 
 type OrderItem = {
   id: string;
+  productId: string;
+  nombreProducto: string;
+  imagenProducto: string | null;
   cantidad: number;
   precioUnitario: number;
-  subtotal: number;
-  product?: {
-    id: string;
-    nombre: string;
-  };
 };
 
 type Order = {
@@ -176,7 +174,7 @@ setOrder(data.order);
                   >
                     <div>
                       <p className="font-semibold">
-                        {item.product?.nombre ?? "Producto"}
+                        {item.nombreProducto}
                       </p>
 
                       <p className="mt-1 text-sm text-[#7a6f69]">
@@ -189,7 +187,7 @@ setOrder(data.order);
                     </div>
 
                     <p className="font-semibold">
-                      {formatPrice(item.subtotal)}
+                      {formatPrice(item.precioUnitario * item.cantidad)}
                     </p>
                   </div>
                 ))}
