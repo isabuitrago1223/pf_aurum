@@ -1,5 +1,5 @@
-import { z } from 'zod';
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 
 import { prisma } from '../config/prisma.js';
 
@@ -125,7 +125,9 @@ const createProductSchema = z.object({
   costo: z.coerce.number().positive().optional(),
   stock: z.coerce.number().int().min(0).default(0),
   stockMinimo: z.coerce.number().int().min(0).default(0),
-  imagen: z.string().min(1).max(500),
+
+  imagen: z.string().url().max(500),
+
   imagenAlt: z.string().max(180).optional(),
   tiempoEntrega: z.string().min(1).max(100),
   pesoGramos: z.coerce.number().int().positive().optional(),
@@ -327,7 +329,10 @@ export async function updateProduct(req: Request, res: Response) {
   });
 }
 
-export async function updateProductStatus(req: Request, res: Response) {
+export async function updateProductStatus(
+  req: Request,
+  res: Response
+) {
   const idParam = req.params.id;
 
   const id = Array.isArray(idParam)
@@ -340,9 +345,11 @@ export async function updateProductStatus(req: Request, res: Response) {
     });
   }
 
-  const result = z.object({
-    activo: z.boolean()
-  }).safeParse(req.body);
+  const result = z
+    .object({
+      activo: z.boolean()
+    })
+    .safeParse(req.body);
 
   if (!result.success) {
     return res.status(400).json({
@@ -380,7 +387,10 @@ export async function updateProductStatus(req: Request, res: Response) {
   });
 }
 
-export async function getAdminProducts(_req: Request, res: Response) {
+export async function getAdminProducts(
+  _req: Request,
+  res: Response
+) {
   const products = await prisma.product.findMany({
     orderBy: {
       createdAt: 'desc'
