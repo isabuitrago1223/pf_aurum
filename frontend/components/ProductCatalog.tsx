@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AddToCartButton from "./AddToCartButton";
 
 type Product = {
   id: string;
@@ -88,11 +89,20 @@ export default async function ProductCatalog() {
                 Ver detalles
               </Link>
 
+              <AddToCartButton
+                product={{
+                  id: product.id,
+                  nombre: product.nombre,
+                  precio: product.precio,
+                  imagen: product.imagen,
+                }}
+              />
+
               <Link
                 href={`/pedido/nuevo?productId=${product.id}`}
-                className="inline-block rounded-lg bg-[#a2725e] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+                className="inline-block rounded-lg bg-[#2f2a27] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
               >
-                Comprar
+                Comprar ahora
               </Link>
             </div>
           </div>
