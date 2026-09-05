@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
+import { useCart } from "../context/CartContext";
 
 type CreateOrderResponse = {
   message: string;
@@ -16,6 +17,21 @@ export default function NewOrderForm() {
   const searchParams = useSearchParams();
   const productId = searchParams.get("productId") ?? "";
 
+  const { items: cartItems, clearCart } = useCart();
+
+  const isCartOrder = !productId && cartItems.length > 0;
+
+  const orderItems = useMemo(() => {
+    if (productId) {
+      return null;
+    }
+
+    return cartItems.map((item) => ({
+      productId: item.productId,
+      cantidad: item.cantidad,
+    }));
+  }, [productId, cartItems]);
+
   const [metodoEntrega, setMetodoEntrega] = useState<
     "DOMICILIO" | "TIENDA"
   >("DOMICILIO");
@@ -28,8 +44,8 @@ export default function NewOrderForm() {
 
     setError("");
 
-    if (!productId) {
-      setError("Debes seleccionar un producto.");
+    if (!productId && cartItems.length === 0) {
+      setError("Debes seleccionar al menos un producto.");
       return;
     }
 
@@ -42,11 +58,24 @@ export default function NewOrderForm() {
 
     const formData = new FormData(event.currentTarget);
 
-    const cantidad = Number(formData.get("cantidad"));
+    let items;
 
-    if (!Number.isInteger(cantidad) || cantidad < 1) {
-      setError("La cantidad debe ser mayor a cero.");
-      return;
+    if (productId) {
+      const cantidad = Number(formData.get("cantidad"));
+
+      if (!Number.isInteger(cantidad) || cantidad < 1) {
+        setError("La cantidad debe ser mayor a cero.");
+        return;
+      }
+
+      items = [
+        {
+          productId,
+          cantidad,
+        },
+      ];
+    } else {
+      items = orderItems ?? [];
     }
 
     const body = {
@@ -90,12 +119,7 @@ export default function NewOrderForm() {
       notasEntrega:
         String(formData.get("notasEntrega") ?? "").trim() ||
         undefined,
-      items: [
-        {
-          productId,
-          cantidad,
-        },
-      ],
+      items,
     };
 
     try {
@@ -122,7 +146,9 @@ export default function NewOrderForm() {
       }
 
       if (response.status === 404) {
-        setError("El producto ya no está disponible.");
+        setError(
+          "Uno de los productos ya no está disponible.",
+        );
         return;
       }
 
@@ -145,6 +171,10 @@ export default function NewOrderForm() {
 
       const data: CreateOrderResponse = await response.json();
 
+      if (isCartOrder) {
+        clearCart();
+      }
+
       window.location.href = `/pedidos/${data.order.id}`;
     } catch {
       setError("No fue posible conectar con el servidor.");
@@ -157,10 +187,10 @@ export default function NewOrderForm() {
     <main className="min-h-screen bg-[#faf7f5] px-6 py-12">
       <div className="mx-auto max-w-3xl">
         <Link
-          href="/productos"
+          href={isCartOrder ? "/carrito" : "/productos"}
           className="text-sm font-semibold text-[#a2725e] hover:opacity-70"
         >
-          ← Volver al catálogo
+          ← {isCartOrder ? "Volver al carrito" : "Volver al catálogo"}
         </Link>
 
         <div className="mt-6 rounded-2xl border border-[#eadfd8] bg-white p-8">
@@ -172,11 +202,46 @@ export default function NewOrderForm() {
             Completa los datos necesarios para realizar tu pedido.
           </p>
 
-          {!productId && (
+          {!productId && cartItems.length === 0 && (
             <div className="mt-6 rounded-lg border border-[#eadfd8] bg-[#faf7f5] p-4">
               <p className="text-sm text-[#7a6f69]">
                 No se seleccionó ningún producto.
               </p>
+
+              <Link
+                href="/productos"
+                className="mt-2 inline-block text-sm font-semibold text-[#a2725e]"
+              >
+                Ver productos
+              </Link>
+            </div>
+          )}
+
+          {isCartOrder && (
+            <div className="mt-6 rounded-xl bg-[#faf7f5] p-5">
+              <h2 className="font-semibold">
+                Productos del carrito
+              </h2>
+
+              <div className="mt-3 space-y-2">
+                {cartItems.map((item) => (
+                  <div
+                    key={item.productId}
+                    className="flex justify-between gap-4 text-sm"
+                  >
+                    <span>
+                      {item.nombre} × {item.cantidad}
+                    </span>
+
+                    <span className="font-semibold">
+                      $
+                      {(
+                        Number(item.precio) * item.cantidad
+                      ).toLocaleString("es-CO")}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -201,24 +266,26 @@ export default function NewOrderForm() {
             onSubmit={handleSubmit}
             className="mt-8 space-y-6"
           >
-            <div>
-              <label
-                htmlFor="cantidad"
-                className="mb-2 block text-sm font-semibold"
-              >
-                Cantidad
-              </label>
+            {productId && (
+              <div>
+                <label
+                  htmlFor="cantidad"
+                  className="mb-2 block text-sm font-semibold"
+                >
+                  Cantidad
+                </label>
 
-              <input
-                id="cantidad"
-                name="cantidad"
-                type="number"
-                min="1"
-                defaultValue="1"
-                required
-                className="w-full rounded-lg border border-[#d8cbc4] px-4 py-3 outline-none focus:border-[#a2725e]"
-              />
-            </div>
+                <input
+                  id="cantidad"
+                  name="cantidad"
+                  type="number"
+                  min="1"
+                  defaultValue="1"
+                  required
+                  className="w-full rounded-lg border border-[#d8cbc4] px-4 py-3 outline-none focus:border-[#a2725e]"
+                />
+              </div>
+            )}
 
             <div>
               <label
@@ -388,7 +455,10 @@ export default function NewOrderForm() {
 
             <button
               type="submit"
-              disabled={!productId || loading}
+              disabled={
+                (!productId && cartItems.length === 0) ||
+                loading
+              }
               className="w-full rounded-lg bg-[#a2725e] px-5 py-3 font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading

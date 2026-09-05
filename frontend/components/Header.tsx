@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useCart } from "../context/CartContext";
 
 type StoredUser = {
   id: string;
@@ -12,6 +13,7 @@ type StoredUser = {
 
 export default function Header() {
   const [user, setUser] = useState<StoredUser | null>(null);
+  const { totalItems } = useCart();
 
   useEffect(() => {
     const storedUser = localStorage.getItem("aurum_user");
@@ -60,6 +62,13 @@ export default function Header() {
 
           <Link href="/productos" className="hover:opacity-70">
             Productos
+          </Link>
+
+          <Link
+            href="/carrito"
+            className="font-semibold text-[#a2725e] hover:opacity-70"
+          >
+            Carrito ({totalItems})
           </Link>
 
           {user ? (
