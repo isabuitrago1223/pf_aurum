@@ -1,10 +1,96 @@
-import type { Response } from 'express';
+import { createHash, timingSafeEqual } from 'node:crypto';
+import type { Request, Response } from 'express';
 import { z } from 'zod';
-
+import { env } from '../config/env.js';
 import { prisma } from '../config/prisma.js';
 import type { AuthenticatedRequest } from '../middlewares/auth.middleware.js';
 import { createWompiTransaction } from '../services/wompi.service.js';
 import { AppError } from '../utils/app-error.js';
+
+type WompiEventData = Record<string, unknown>;
+
+function getNestedValue(
+  data: WompiEventData,
+  path: string
+): unknown {
+  return path.split('.').reduce<unknown>((current, key) => {
+    if (
+      current &&
+      typeof current === 'object' &&
+      key in current
+    ) {
+      return (current as Record<string, unknown>)[key];
+    }
+
+    return undefined;
+  }, data);
+}
+
+function validateWompiEventSignature(body: {
+  data: WompiEventData;
+  signature: {
+    properties: string[];
+    checksum: string;
+  };
+  timestamp: number;
+}) {
+  const concatenatedValues = body.signature.properties
+    .map((property) => {
+      const value = getNestedValue(body.data, property);
+
+      if (value === undefined || value === null) {
+        throw new AppError(
+          400,
+          'Evento de Wompi con propiedades de firma invalidas.'
+        );
+      }
+
+      return String(value);
+    })
+    .join('');
+
+  const rawSignature =
+    concatenatedValues +
+    String(body.timestamp) +
+    env.WOMPI_EVENTS_SECRET;
+
+  const expectedChecksum = createHash('sha256')
+    .update(rawSignature)
+    .digest('hex');
+
+  const receivedChecksum = body.signature.checksum.toLowerCase();
+
+  const expectedBuffer = Buffer.from(expectedChecksum, 'hex');
+  const receivedBuffer = Buffer.from(receivedChecksum, 'hex');
+
+  return (
+    expectedBuffer.length === receivedBuffer.length &&
+    timingSafeEqual(expectedBuffer, receivedBuffer)
+  );
+}
+
+const wompiWebhookSchema = z.object({
+  event: z.string().min(1),
+  data: z.record(z.unknown()),
+  signature: z.object({
+    properties: z.array(z.string().min(1)).min(1),
+    checksum: z.string().regex(/^[a-fA-F0-9]{64}$/)
+  }),
+  timestamp: z.number()
+});
+
+const wompiWebhookTransactionSchema = z.object({
+  id: z.string().min(1),
+  reference: z.string().min(1),
+  status: z.enum([
+    'PENDING',
+    'APPROVED',
+    'DECLINED',
+    'VOIDED',
+    'ERROR'
+  ]),
+  amount_in_cents: z.number().int().nonnegative()
+});
 
 const createPaymentSchema = z.object({
   orderId: z.string().min(1),
@@ -191,6 +277,89 @@ export async function createWompiPayment(
     message: 'Transaccion de Wompi creada correctamente.',
     payment,
     transaction
+  });
+}
+
+export async function handleWompiWebhook(
+  req: Request,
+  res: Response
+) {
+  const body = wompiWebhookSchema.parse(req.body);
+
+  const isValidSignature = validateWompiEventSignature(body);
+
+  if (!isValidSignature) {
+    throw new AppError(
+      401,
+      'Firma de evento de Wompi invalida.'
+    );
+  }
+
+  if (body.event !== 'transaction.updated') {
+    return res.status(200).json({
+      message: 'Evento de Wompi ignorado.'
+    });
+  }
+
+  const transaction = wompiWebhookTransactionSchema.parse(
+    body.data.transaction
+  );
+
+  const payment = await prisma.payment.findFirst({
+    where: {
+      proveedorTransaccion: transaction.id
+    }
+  });
+
+  if (!payment) {
+    return res.status(200).json({
+      message: 'Pago de Wompi no encontrado.'
+    });
+  }
+
+  if (payment.referencia !== transaction.reference) {
+    throw new AppError(
+      409,
+      'La referencia de Wompi no coincide con el pago registrado.'
+    );
+  }
+
+  const expectedAmountInCents = Math.round(
+    Number(payment.monto) * 100
+  );
+
+  if (expectedAmountInCents !== transaction.amount_in_cents) {
+    throw new AppError(
+      409,
+      'El monto de Wompi no coincide con el pago registrado.'
+    );
+  }
+
+  const newStatus =
+    transaction.status === 'APPROVED'
+      ? 'APROBADO'
+      : transaction.status === 'DECLINED' ||
+          transaction.status === 'VOIDED' ||
+          transaction.status === 'ERROR'
+        ? 'RECHAZADO'
+        : 'PENDIENTE';
+
+  const updatedPayment = await prisma.payment.update({
+    where: {
+      id: payment.id
+    },
+    data: {
+      estado: newStatus,
+      respuestaPasarela: JSON.parse(JSON.stringify(body)),
+      ...(newStatus === 'APROBADO' && !payment.pagadoAt
+        ? { pagadoAt: new Date() }
+        : {})
+    }
+  });
+
+  return res.status(200).json({
+    message: 'Evento de Wompi procesado correctamente.',
+    payment: updatedPayment
   });
 }
 
