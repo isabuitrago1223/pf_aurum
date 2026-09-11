@@ -3,6 +3,7 @@ import { Router } from 'express';
 import {
   createPayment,
   createWompiPayment,
+  getWompiAcceptanceData,
   handleWompiWebhook,
   listAdminPayments,
   updateAdminPaymentStatus
@@ -27,6 +28,13 @@ paymentRouter.patch(
   requireAuth,
   requireRole('ADMIN'),
   asyncHandler(updateAdminPaymentStatus)
+);
+
+paymentRouter.get(
+  '/wompi/acceptance',
+  requireAuth,
+  requireRole('CLIENTE'),
+  asyncHandler(getWompiAcceptanceData)
 );
 
 paymentRouter.post(
