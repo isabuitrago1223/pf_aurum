@@ -1,86 +1,159 @@
+"use client";
+
 import Link from "next/link";
+import {
+  ArrowRight,
+  CalendarCheck,
+  MessageSquare,
+  Palette,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 
 export default function Hero() {
   return (
-    <section
-      id="inicio"
-      className="px-4 py-8 sm:px-6 lg:px-8"
-    >
-      <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#2f123f] via-[#4b1f63] to-[#6b2a83] shadow-xl">
-        <div className="grid min-h-[520px] items-center gap-10 px-6 py-12 sm:px-10 lg:grid-cols-2 lg:px-14 lg:py-16">
-          {/* Contenido */}
-          <div className="relative z-10">
-            <span className="inline-flex rounded-full border border-[#d9b45b]/40 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#f4d783] backdrop-blur">
-              Detalles hechos para emocionar
-            </span>
+    <section className="px-4 py-4 sm:px-6 lg:px-8">
+      <div className="relative mx-auto max-w-7xl overflow-hidden rounded-3xl border border-purple-800/50 bg-gradient-to-b from-purple-950 via-purple-900 to-indigo-950 text-white shadow-2xl">
+        {/* Decoración de fondo */}
+        <div className="pointer-events-none absolute -right-12 -top-12 h-96 w-96 rounded-full bg-purple-600/20 blur-3xl" />
 
-            <h1 className="mt-6 max-w-2xl text-4xl font-bold leading-tight text-white sm:text-5xl lg:text-6xl">
-              Creamos momentos inolvidables en cada detalle
-            </h1>
+        <div className="pointer-events-none absolute -bottom-12 -left-12 h-96 w-96 rounded-full bg-amber-500/10 blur-3xl" />
 
-            <p className="mt-6 max-w-xl text-base leading-8 text-[#eee5f2] sm:text-lg">
-              Sorprende a quienes más quieres con desayunos, anchetas,
-              ramos, regalos y detalles personalizados para cada ocasión.
-            </p>
+        {/* Contenido principal */}
+        <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-6 py-16 sm:py-24 lg:grid-cols-2 lg:px-12">
+          {/* Texto */}
+          <div className="space-y-6 text-center lg:text-left">
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/15 px-4 py-2 text-xs font-bold uppercase tracking-wider text-amber-300 backdrop-blur-sm">
+              <Sparkles className="h-4 w-4 text-amber-300" />
 
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/productos"
-                className="rounded-full bg-[#d6a83a] px-7 py-3.5 text-sm font-bold text-[#2f123f] transition hover:-translate-y-0.5 hover:bg-[#e0bb5b]"
-              >
-                Ver productos
-              </Link>
-
-              <Link
-                href="/#categorias"
-                className="rounded-full border border-white/40 px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
-              >
-                Explorar categorías
-              </Link>
+              <span>
+                Aurum Decoraciones • Detalles con Amor
+              </span>
             </div>
 
-            <div className="mt-10 flex flex-wrap gap-x-8 gap-y-4 text-sm text-[#e8dff0]">
-              <div className="flex items-center gap-2">
-                <span className="text-[#f0c85b]">✓</span>
-                Entregas con amor
-              </div>
+            <h1 className="font-serif text-3xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl">
+              &quot;Creamos momentos{" "}
+              <span className="bg-gradient-to-r from-amber-200 via-amber-400 to-amber-500 bg-clip-text text-transparent">
+                inolvidables
+              </span>{" "}
+              en cada detalle.&quot;
+            </h1>
 
-              <div className="flex items-center gap-2">
-                <span className="text-[#f0c85b]">✓</span>
-                Personalización especial
-              </div>
+            <p className="mx-auto max-w-xl text-sm font-light leading-relaxed text-purple-200 sm:text-base lg:mx-0">
+              Sorprende a quien más amas con desayunos hechos al
+              instante, anchetas gourmet seleccionadas, ramos
+              florales de lavanda y regalos 100% personalizados con
+              entrega garantizada.
+            </p>
 
-              <div className="flex items-center gap-2">
-                <span className="text-[#f0c85b]">✓</span>
-                Detalles únicos
-              </div>
+            {/* Botones */}
+            <div className="flex flex-col items-center justify-center gap-4 pt-4 sm:flex-row lg:justify-start">
+              <Link
+                href="/productos"
+                className="group flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 px-8 py-4 text-sm font-black text-purple-950 shadow-xl transition-all hover:from-amber-300 hover:to-amber-500 sm:w-auto"
+              >
+                <span>Comprar ahora</span>
+
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Link>
+
+              <Link
+                href="/productos"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-purple-700/60 bg-purple-900/60 px-8 py-4 text-sm font-bold text-white backdrop-blur-sm transition-all hover:bg-purple-800/80 sm:w-auto"
+              >
+                <span>Ver catálogo</span>
+              </Link>
             </div>
           </div>
 
-          {/* Espacio visual */}
-          <div className="relative flex items-center justify-center">
-            <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#d6a83a]/20 blur-3xl" />
-            <div className="absolute -bottom-12 -left-10 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
+          {/* Imagen */}
+          <div className="relative mx-auto w-full max-w-md lg:mx-0 lg:max-w-none">
+            <div className="group relative overflow-hidden rounded-3xl border-2 border-amber-400/30 shadow-2xl">
+              <img
+                src="https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?q=80&w=1000&auto=format&fit=crop"
+                alt="Desayuno Sorpresa Aurum Decoraciones"
+                className="h-96 w-full object-cover transition-transform duration-700 group-hover:scale-105 lg:h-[460px]"
+              />
 
-            <div className="relative w-full max-w-md rounded-[2rem] border border-white/15 bg-white/10 p-5 shadow-2xl backdrop-blur-sm">
-              <div className="flex min-h-[360px] items-center justify-center rounded-[1.5rem] border border-white/10 bg-gradient-to-br from-white/10 to-white/5 p-8 text-center">
-                <div>
-                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#d6a83a] text-3xl font-bold text-[#3b174d] shadow-lg">
-                    A
+              <div className="absolute inset-0 flex items-end bg-gradient-to-t from-purple-950/80 via-transparent to-transparent p-6">
+                <div className="w-full rounded-2xl border border-purple-100 bg-white/95 p-4 text-purple-950 shadow-lg backdrop-blur-md">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600">
+                        Favorito de Temporada
+                      </span>
+
+                      <h3 className="font-serif text-sm font-bold text-slate-900">
+                        Desayuno Sorpresa Aurum Deluxe
+                      </h3>
+                    </div>
+
+                    <span className="shrink-0 font-serif text-base font-black text-purple-900">
+                      $145.000 COP
+                    </span>
                   </div>
-
-                  <p className="mt-6 text-xl font-semibold text-white">
-                    Aurum Decoraciones
-                  </p>
-
-                  <p className="mx-auto mt-3 max-w-xs text-sm leading-6 text-[#e8dff0]">
-                    Aquí mostraremos una imagen destacada real del catálogo
-                    cuando los productos estén vinculados correctamente con
-                    Cloudinary.
-                  </p>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Beneficios */}
+        <div className="grid grid-cols-2 gap-6 border-t border-purple-800/50 bg-purple-950/80 px-6 py-6 text-center lg:grid-cols-4">
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-400/20 text-amber-300">
+              <CalendarCheck className="h-5 w-5" />
+            </div>
+
+            <span className="text-xs font-bold text-white">
+              Entregas programadas
+            </span>
+
+            <span className="text-[11px] text-purple-200">
+              Eliges día y hora exacta
+            </span>
+          </div>
+
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-400/20 text-amber-300">
+              <Palette className="h-5 w-5" />
+            </div>
+
+            <span className="text-xs font-bold text-white">
+              Productos personalizados
+            </span>
+
+            <span className="text-[11px] text-purple-200">
+              Colores, globos y frutas
+            </span>
+          </div>
+
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-400/20 text-amber-300">
+              <MessageSquare className="h-5 w-5" />
+            </div>
+
+            <span className="text-xs font-bold text-white">
+              Atención por WhatsApp
+            </span>
+
+            <span className="text-[11px] text-purple-200">
+              Asesoría inmediata 24/7
+            </span>
+          </div>
+
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-400/20 text-amber-300">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+
+            <span className="text-xs font-bold text-white">
+              Pago seguro
+            </span>
+
+            <span className="text-[11px] text-purple-200">
+              PSE, Nequi & Daviplata
+            </span>
           </div>
         </div>
       </div>
