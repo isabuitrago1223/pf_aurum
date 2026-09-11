@@ -2,6 +2,9 @@ import { Router } from 'express';
 
 import {
   createPayment,
+  createWompiPayment,
+  getWompiAcceptanceData,
+  handleWompiWebhook,
   listAdminPayments,
   updateAdminPaymentStatus
 } from '../controllers/payment.controller.js';
@@ -25,6 +28,25 @@ paymentRouter.patch(
   requireAuth,
   requireRole('ADMIN'),
   asyncHandler(updateAdminPaymentStatus)
+);
+
+paymentRouter.get(
+  '/wompi/acceptance',
+  requireAuth,
+  requireRole('CLIENTE'),
+  asyncHandler(getWompiAcceptanceData)
+);
+
+paymentRouter.post(
+  '/wompi/webhook',
+  asyncHandler(handleWompiWebhook)
+);
+
+paymentRouter.post(
+  '/wompi',
+  requireAuth,
+  requireRole('CLIENTE'),
+  asyncHandler(createWompiPayment)
 );
 
 paymentRouter.post(
