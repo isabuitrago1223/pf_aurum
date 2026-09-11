@@ -3,6 +3,13 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Package,
+  ReceiptText,
+  ShoppingBag,
+} from "lucide-react";
 
 type OrderItem = {
   id: string;
@@ -25,12 +32,6 @@ type Order = {
   items: OrderItem[];
 };
 
-type PaymentMethod =
-  | "NEQUI"
-  | "DAVIPLATA"
-  | "PSE"
-  | "TRANSFERENCIA_BANCARIA";
-
 export default function OrderDetailPage() {
   const params = useParams<{ id: string }>();
   const orderId = params.id;
@@ -38,12 +39,6 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  const [paymentMethod, setPaymentMethod] =
-    useState<PaymentMethod>("NEQUI");
-  const [paymentLoading, setPaymentLoading] = useState(false);
-  const [paymentMessage, setPaymentMessage] = useState("");
-  const [paymentError, setPaymentError] = useState("");
 
   useEffect(() => {
     async function loadOrder() {
@@ -84,7 +79,7 @@ export default function OrderDetailPage() {
 
         const data: { order: Order } = await response.json();
 
-setOrder(data.order);
+        setOrder(data.order);
       } catch {
         setError("No fue posible conectar con el servidor.");
       } finally {
@@ -97,56 +92,6 @@ setOrder(data.order);
     }
   }, [orderId]);
 
-  async function handlePayment() {
-    if (!order) {
-      return;
-    }
-
-    const token = localStorage.getItem("aurum_token");
-
-    if (!token) {
-      setPaymentError("Debes iniciar sesión para registrar el pago.");
-      return;
-    }
-
-    setPaymentLoading(true);
-    setPaymentMessage("");
-    setPaymentError("");
-
-    try {
-      const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-
-      const response = await fetch(`${apiUrl}/api/payments`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          orderId: order.id,
-          metodo: paymentMethod,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setPaymentError(
-          data?.message ?? "No fue posible registrar el pago.",
-        );
-        return;
-      }
-
-      setPaymentMessage(
-        "Pago registrado correctamente. Estado inicial: PENDIENTE.",
-      );
-    } catch {
-      setPaymentError("No fue posible conectar con el servidor.");
-    } finally {
-      setPaymentLoading(false);
-    }
-  }
   function formatPrice(value: number) {
     return new Intl.NumberFormat("es-CO", {
       style: "currency",
@@ -163,188 +108,217 @@ setOrder(data.order);
     }).format(new Date(value));
   }
 
+  function getStatusClasses(status: string) {
+    switch (status) {
+      case "PENDIENTE":
+        return "border-amber-200 bg-amber-50 text-amber-700";
+
+      case "CONFIRMADO":
+      case "APROBADO":
+        return "border-emerald-200 bg-emerald-50 text-emerald-700";
+
+      case "EN_PREPARACION":
+        return "border-purple-200 bg-purple-50 text-purple-700";
+
+      case "ENVIADO":
+        return "border-blue-200 bg-blue-50 text-blue-700";
+
+      case "ENTREGADO":
+        return "border-green-200 bg-green-50 text-green-700";
+
+      case "CANCELADO":
+        return "border-red-200 bg-red-50 text-red-700";
+
+      default:
+        return "border-gray-200 bg-gray-50 text-gray-700";
+    }
+  }
+
   return (
-    <main className="min-h-screen bg-[#fffaf7] px-6 py-12 text-[#2f2a27]">
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-8">
+    <main className="min-h-screen bg-[#faf7fb] text-[#2f123f]">
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#2f123f] via-[#4b1f63] to-[#6b2a83] px-5 py-12 text-white sm:px-6 lg:px-8">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-purple-400/20 blur-3xl" />
+
+        <div className="relative mx-auto max-w-5xl">
           <Link
             href="/pedidos"
-            className="text-sm font-semibold text-[#a2725e] transition hover:opacity-70"
+            className="inline-flex items-center gap-2 text-sm font-bold text-[#f0c85b] transition hover:text-white"
           >
-← Volver a mis pedidos
+            <ArrowLeft size={17} />
+            Volver a mis pedidos
           </Link>
 
-          <h1 className="mt-4 text-3xl font-bold">
-            Detalle del pedido
-          </h1>
+          <div className="mt-8">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#f0c85b]">
+              Aurum Decoraciones
+            </p>
+
+            <h1 className="mt-3 font-serif text-4xl font-black sm:text-5xl">
+              Detalle del pedido
+            </h1>
+
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-[#eee5f2] sm:text-base">
+              Consulta los productos, valores y estado actual de tu pedido.
+            </p>
+          </div>
         </div>
+      </section>
 
-        {loading && (
-          <section className="rounded-3xl border border-[#eadfd8] bg-white p-8 shadow-sm">
-            <p className="text-center text-[#7a6f69]">
-              Cargando pedido...
-            </p>
-          </section>
-        )}
-
-        {!loading && error && (
-          <section className="rounded-3xl border border-[#eadfd8] bg-white p-8 shadow-sm">
-            <p className="text-center text-[#7a6f69]">
-              {error}
-            </p>
-          </section>
-        )}
-
-        {!loading && !error && order && (
-          <section className="rounded-3xl border border-[#eadfd8] bg-white p-8 shadow-sm">
-            <div className="flex flex-col justify-between gap-4 border-b border-[#eadfd8] pb-6 sm:flex-row">
-              <div>
-                <p className="text-sm text-[#7a6f69]">
-                  Pedido
-                </p>
-
-                <h2 className="mt-1 text-xl font-bold">
-                  {order.numeroPedido}
-                </h2>
-
-                <p className="mt-2 text-sm text-[#7a6f69]">
-                  {formatDate(order.createdAt)}
-                </p>
+      <section className="px-5 py-10 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl">
+          {loading && (
+            <div className="rounded-[2rem] border border-[#e7ddec] bg-white p-10 text-center shadow-sm">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-purple-50 text-[#6b2a83]">
+                <ShoppingBag size={25} />
               </div>
 
-              <div className="sm:text-right">
-                <p className="text-sm font-semibold text-[#a2725e]">
-                  {order.estado.replaceAll("_", " ")}
-                </p>
-
-                <p className="mt-2 text-2xl font-bold">
-                  {formatPrice(order.total)}
-                </p>
-              </div>
+              <p className="mt-4 font-bold text-[#5f5363]">
+                Cargando pedido...
+              </p>
             </div>
+          )}
 
-            <div className="mt-6">
-              <h3 className="text-lg font-bold">
-                Productos
-              </h3>
+          {!loading && error && (
+            <div className="rounded-[2rem] border border-[#e7ddec] bg-white p-8 text-center shadow-sm">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-purple-50 text-[#6b2a83]">
+                <Package size={25} />
+              </div>
 
-              <div className="mt-4 space-y-4">
-                {order.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex justify-between gap-4 rounded-2xl border border-[#eadfd8] p-4"
-                  >
-                    <div>
-                      <p className="font-semibold">
-                        {item.nombreProducto}
-                      </p>
+              <h2 className="mt-4 font-serif text-xl font-black text-[#351641]">
+                No pudimos mostrar este pedido
+              </h2>
 
-                      <p className="mt-1 text-sm text-[#7a6f69]">
-                        Cantidad: {item.cantidad}
-                      </p>
+              <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#807385]">
+                {error}
+              </p>
+            </div>
+          )}
 
-                      <p className="mt-1 text-sm text-[#7a6f69]">
-                        Precio unitario: {formatPrice(item.precioUnitario)}
-                      </p>
+          {!loading && !error && order && (
+            <div className="space-y-6">
+              <section className="rounded-[2rem] border border-[#e7ddec] bg-white p-6 shadow-sm sm:p-8">
+                <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-start">
+                  <div className="flex gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-purple-50 text-[#6b2a83]">
+                      <ReceiptText size={22} />
                     </div>
 
-                    <p className="font-semibold">
-                      {formatPrice(item.precioUnitario * item.cantidad)}
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#9a8aa0]">
+                        Pedido
+                      </p>
+
+                      <h2 className="mt-1 text-xl font-black text-[#351641]">
+                        {order.numeroPedido}
+                      </h2>
+
+                      <div className="mt-2 flex items-center gap-2 text-sm text-[#807385]">
+                        <CalendarDays size={15} />
+                        {formatDate(order.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="sm:text-right">
+                    <span
+                      className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getStatusClasses(
+                        order.estado,
+                      )}`}
+                    >
+                      {order.estado.replaceAll("_", " ")}
+                    </span>
+
+                    <p className="mt-3 text-2xl font-black text-[#351641]">
+                      {formatPrice(order.total)}
                     </p>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-8 space-y-3 border-t border-[#eadfd8] pt-6">
-              <div className="flex justify-between">
-                <span className="text-[#7a6f69]">Subtotal</span>
-                <span>{formatPrice(order.subtotal)}</span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="text-[#7a6f69]">Envío</span>
-                <span>{formatPrice(order.costoEnvio)}</span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="text-[#7a6f69]">Descuento</span>
-                <span>{formatPrice(order.descuento)}</span>
-              </div>
-
-              <div className="flex justify-between border-t border-[#eadfd8] pt-3 text-lg font-bold">
-                <span>Total</span>
-                <span>{formatPrice(order.total)}</span>
-              </div>
-            </div>
-            {order.estado !== "CANCELADO" && (
-              <div className="mt-8 border-t border-[#eadfd8] pt-6">
-                <h3 className="text-lg font-bold">Registrar pago</h3>
-
-                <p className="mt-2 text-sm text-[#7a6f69]">
-                  Selecciona el método de pago. El registro se creará inicialmente en estado PENDIENTE.
-                </p>
-
-                <div className="mt-4">
-                  <label
-                    htmlFor="paymentMethod"
-                    className="block text-sm font-semibold"
-                  >
-                    Método de pago
-                  </label>
-
-                  <select
-                    id="paymentMethod"
-                    value={paymentMethod}
-                    onChange={(event) =>
-                      setPaymentMethod(event.target.value as PaymentMethod)
-                    }
-                    className="mt-2 w-full rounded-xl border border-[#eadfd8] bg-white px-4 py-3 outline-none"
-                  >
-                    <option value="NEQUI">Nequi</option>
-                    <option value="DAVIPLATA">Daviplata</option>
-                    <option value="PSE">PSE</option>
-                    <option value="TRANSFERENCIA_BANCARIA">
-                      Transferencia bancaria
-                    </option>
-                  </select>
                 </div>
+              </section>
 
-                <button
-                  type="button"
-                  onClick={handlePayment}
-                  disabled={paymentLoading}
-                  className="mt-4 rounded-xl bg-[#a2725e] px-5 py-3 font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {paymentLoading
-                    ? "Registrando pago..."
-                    : "Registrar pago"}
-                </button>
+              <section className="rounded-[2rem] border border-[#e7ddec] bg-white p-6 shadow-sm sm:p-8">
+                <h3 className="font-serif text-2xl font-black text-[#351641]">
+                  Productos
+                </h3>
 
-                {paymentMessage && (
-                  <p className="mt-4 text-sm font-semibold text-green-700">
-                    {paymentMessage}
-                  </p>
-                )}
+                <div className="mt-5 space-y-4">
+                  {order.items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex flex-col justify-between gap-4 rounded-2xl border border-[#eee5f2] bg-[#fdfbfe] p-5 sm:flex-row sm:items-center"
+                    >
+                      <div>
+                        <p className="font-black text-[#351641]">
+                          {item.nombreProducto}
+                        </p>
 
-                {paymentError && (
-                  <p className="mt-4 text-sm font-semibold text-red-700">
-                    {paymentError}
-                  </p>
-                )}
-              </div>
-            )}
+                        <p className="mt-2 text-sm text-[#807385]">
+                          Cantidad: {item.cantidad}
+                        </p>
 
-            {order.estado === "CANCELADO" && (
-              <div className="mt-8 border-t border-[#eadfd8] pt-6">
-                <p className="text-sm font-semibold text-[#a2725e]">
-                  Este pedido está cancelado y no permite registrar pagos.
-                </p>
-              </div>
-            )}
-          </section>
-        )}
-      </div>
+                        <p className="mt-1 text-sm text-[#807385]">
+                          Precio unitario:{" "}
+                          {formatPrice(item.precioUnitario)}
+                        </p>
+                      </div>
+
+                      <p className="text-lg font-black text-[#351641]">
+                        {formatPrice(
+                          item.precioUnitario * item.cantidad,
+                        )}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-[2rem] border border-[#e7ddec] bg-white p-6 shadow-sm sm:p-8">
+                <h3 className="font-serif text-2xl font-black text-[#351641]">
+                  Resumen del pedido
+                </h3>
+
+                <div className="mt-5 space-y-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[#807385]">Subtotal</span>
+                    <span className="font-bold text-[#351641]">
+                      {formatPrice(order.subtotal)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[#807385]">Envío</span>
+                    <span className="font-bold text-[#351641]">
+                      {formatPrice(order.costoEnvio)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[#807385]">Descuento</span>
+                    <span className="font-bold text-[#351641]">
+                      {formatPrice(order.descuento)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between border-t border-[#eee5f2] pt-4 text-lg">
+                    <span className="font-black text-[#351641]">
+                      Total
+                    </span>
+
+                    <span className="font-black text-[#6b2a83]">
+                      {formatPrice(order.total)}
+                    </span>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-[2rem] border border-[#eadff0] bg-[#f8f1fb] p-6 text-sm leading-6 text-[#6d5f72]">
+                La opción de pago se conectará después con la integración de
+                Wompi. Por ahora esta pantalla muestra únicamente la información
+                del pedido para no interferir con la integración de pagos.
+              </section>
+            </div>
+          )}
+        </div>
+      </section>
     </main>
   );
 }
