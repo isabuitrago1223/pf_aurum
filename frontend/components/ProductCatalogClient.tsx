@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CheckCircle2,
   Clock3,
@@ -41,12 +41,22 @@ type ProductCatalogClientProps = {
   products: CatalogProduct[];
   selectedCategory?: string;
   selectedOccasion?: string;
+  searchQuery?: string;
 };
+
+function normalizeText(value?: string | null) {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
 
 export default function ProductCatalogClient({
   products,
   selectedCategory,
   selectedOccasion,
+  searchQuery,
 }: ProductCatalogClientProps) {
   const [selectedProduct, setSelectedProduct] =
     useState<CatalogProduct | null>(null);
@@ -54,7 +64,24 @@ export default function ProductCatalogClient({
   const [authModalOpen, setAuthModalOpen] =
     useState(false);
 
+  const [sessionActive, setSessionActive] =
+    useState(false);
+
+  useEffect(() => {
+    const token =
+      localStorage.getItem("aurum_token");
+
+    const user =
+      localStorage.getItem("aurum_user");
+
+    setSessionActive(Boolean(token && user));
+  }, []);
+
   function hasActiveSession() {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
     const token =
       localStorage.getItem("aurum_token");
 
@@ -91,6 +118,9 @@ export default function ProductCatalogClient({
     ).values(),
   );
 
+  const normalizedSearch =
+    normalizeText(searchQuery);
+
   const filteredProducts = products.filter(
     (product) => {
       const matchesCategory =
@@ -103,9 +133,29 @@ export default function ProductCatalogClient({
         product.occasion?.slug ===
           selectedOccasion;
 
+      const searchableText = normalizeText(
+        [
+          product.nombre,
+          product.descripcion,
+          product.category.nombre,
+          product.category.slug,
+          product.occasion?.nombre,
+          product.occasion?.slug,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+
+      const matchesSearch =
+        !normalizedSearch ||
+        searchableText.includes(
+          normalizedSearch,
+        );
+
       return (
         matchesCategory &&
-        matchesOccasion
+        matchesOccasion &&
+        matchesSearch
       );
     },
   );
@@ -219,8 +269,8 @@ export default function ProductCatalogClient({
             </h2>
 
             <p className="mt-2 text-sm text-slate-500">
-              No hay productos disponibles
-              para esta categoría y ocasión.
+              No encontramos productos que coincidan
+              con tu búsqueda o con los filtros seleccionados.
             </p>
 
             <Link
@@ -414,7 +464,7 @@ export default function ProductCatalogClient({
                         </button>
 
                         {product.stock > 0 &&
-                          (hasActiveSession() ? (
+                          (sessionActive ? (
                             <AddToCartButton
                               product={{
                                 id: product.id,

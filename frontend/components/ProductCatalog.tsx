@@ -9,6 +9,7 @@ type ProductsResponse = {
 type ProductCatalogProps = {
   selectedCategory?: string;
   selectedOccasion?: string;
+  searchQuery?: string;
 };
 
 async function getProducts(): Promise<CatalogProduct[]> {
@@ -40,6 +41,7 @@ async function getProducts(): Promise<CatalogProduct[]> {
 export default async function ProductCatalog({
   selectedCategory,
   selectedOccasion,
+  searchQuery,
 }: ProductCatalogProps) {
   const products = await getProducts();
 
@@ -58,6 +60,7 @@ export default async function ProductCatalog({
       products={products}
       selectedCategory={selectedCategory}
       selectedOccasion={selectedOccasion}
+      searchQuery={searchQuery}
     />
   );
 }
