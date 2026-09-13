@@ -2,8 +2,10 @@ import cors from 'cors';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import swaggerUi from 'swagger-ui-express';
 
 import { env } from './config/env.js';
+import { swaggerSpec } from './config/swagger.js';
 
 import { errorHandler } from './middlewares/error.middleware.js';
 
@@ -40,6 +42,8 @@ app.use(
     legacyHeaders: false
   })
 );
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use('/api/health', healthRouter);
 
