@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 
-import { login, register } from '../controllers/auth.controller.js';
+import {
+  forgotPassword,
+  login,
+  register,
+  resetPassword
+} from '../controllers/auth.controller.js';
 import { asyncHandler } from '../middlewares/async-handler.middleware.js';
 import { requireAuth, requireRole } from '../middlewares/auth.middleware.js';
 
@@ -14,6 +19,16 @@ const loginRateLimit = rateLimit({
   legacyHeaders: false,
   message: {
     message: 'Demasiados intentos de inicio de sesion. Intenta nuevamente mas tarde.'
+  }
+});
+
+const passwordRecoveryRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: {
+    message: 'Demasiados intentos de recuperacion. Intenta nuevamente mas tarde.'
   }
 });
 
@@ -140,6 +155,70 @@ const loginRateLimit = rateLimit({
 
 /**
  * @openapi
+ * /api/auth/forgot-password:
+ *   post:
+ *     tags:
+ *       - Autenticacion
+ *     summary: Solicitar recuperacion de contrasena
+ *     description: Genera un enlace temporal de recuperacion si el correo corresponde a una cuenta valida.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: cliente@aurum.com
+ *     responses:
+ *       200:
+ *         description: Solicitud procesada
+ *       400:
+ *         description: Correo invalido
+ *       429:
+ *         description: Demasiados intentos de recuperacion
+ */
+
+/**
+ * @openapi
+ * /api/auth/reset-password:
+ *   post:
+ *     tags:
+ *       - Autenticacion
+ *     summary: Restablecer contrasena
+ *     description: Cambia la contrasena usando un token temporal valido.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *               - password
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 example: token_recibido_por_correo
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: NuevaClave123*
+ *     responses:
+ *       200:
+ *         description: Contrasena restablecida correctamente
+ *       400:
+ *         description: Token invalido, expirado o nueva contrasena invalida
+ *       429:
+ *         description: Demasiados intentos de recuperacion
+ */
+
+/**
+ * @openapi
  * /api/auth/profile:
  *   get:
  *     tags:
@@ -183,6 +262,18 @@ authRouter.post(
   '/login',
   loginRateLimit,
   asyncHandler(login)
+);
+
+authRouter.post(
+  '/forgot-password',
+  passwordRecoveryRateLimit,
+  asyncHandler(forgotPassword)
+);
+
+authRouter.post(
+  '/reset-password',
+  passwordRecoveryRateLimit,
+  asyncHandler(resetPassword)
 );
 
 authRouter.get('/profile', requireAuth, (req, res) => {
