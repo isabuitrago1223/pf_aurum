@@ -11,6 +11,7 @@ import { errorHandler } from './middlewares/error.middleware.js';
 
 import { authRouter } from './routes/auth.routes.js';
 import { categoryRouter } from './routes/category.routes.js';
+import { clientRouter } from './routes/client.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 import { occasionRouter } from './routes/occasion.routes.js';
 import { orderRouter } from './routes/order.routes.js';
@@ -48,6 +49,8 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/health', healthRouter);
 
 app.use('/api/categories', categoryRouter);
+
+app.use('/api/clients', clientRouter);
 
 app.use('/api/products', productRouter);
 
