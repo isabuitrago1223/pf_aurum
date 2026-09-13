@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
+  FormEvent,
   useEffect,
   useRef,
   useState,
 } from "react";
 import {
+  Check,
   ChevronDown,
   Gift,
   Heart,
@@ -225,27 +228,29 @@ const categoryMenus: CategoryMenu[] = [
 const popularSearches = [
   {
     label: "Desayunos",
-    href: "/productos?categoria=desayunos",
+    href: "/productos?buscar=desayunos",
   },
   {
     label: "Anchetas",
-    href: "/productos?categoria=anchetas",
+    href: "/productos?buscar=anchetas",
   },
   {
     label: "Ramos",
-    href: "/productos?categoria=ramos",
+    href: "/productos?buscar=ramos",
   },
   {
-    label: "Regalos",
-    href: "/productos?categoria=regalos",
+    label: "Cumpleaños",
+    href: "/productos?buscar=cumpleanos",
   },
   {
-    label: "Personalizados",
-    href: "/productos?categoria=personalizados",
+    label: "Grados",
+    href: "/productos?buscar=grados",
   },
 ];
 
 export default function Header() {
+  const router = useRouter();
+
   const [user, setUser] =
     useState<StoredUser | null>(null);
 
@@ -258,15 +263,24 @@ export default function Header() {
   const [searchOpen, setSearchOpen] =
     useState(false);
 
-  const [cartOpen, setCartOpen] =
-    useState(false);
+  const [searchQuery, setSearchQuery] =
+    useState("");
+
+  const [mobileSearchQuery, setMobileSearchQuery] =
+    useState("");
 
   const [
     activeCategoryMenu,
     setActiveCategoryMenu,
   ] = useState<string | null>(null);
 
-  const { totalItems } = useCart();
+  const {
+    totalItems,
+    isCartDrawerOpen,
+    openCartDrawer,
+    closeCartDrawer,
+    cartNotification,
+  } = useCart();
 
   const userMenuRef =
     useRef<HTMLDivElement>(null);
@@ -345,6 +359,47 @@ export default function Header() {
     );
   }
 
+  function handleSearch(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    const value = searchQuery.trim();
+
+    if (!value) {
+      return;
+    }
+
+    setSearchOpen(false);
+
+    router.push(
+      `/productos?buscar=${encodeURIComponent(
+        value,
+      )}`,
+    );
+  }
+
+  function handleMobileSearch(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    const value =
+      mobileSearchQuery.trim();
+
+    if (!value) {
+      return;
+    }
+
+    setMobileOpen(false);
+
+    router.push(
+      `/productos?buscar=${encodeURIComponent(
+        value,
+      )}`,
+    );
+  }
+
   return (
     <>
       <header className="sticky top-0 z-50 border-b border-purple-100 bg-white shadow-sm">
@@ -354,8 +409,8 @@ export default function Header() {
             <Sparkles className="h-3.5 w-3.5 text-amber-300" />
 
             <span>
-              Detalles inolvidables para celebrar momentos
-              especiales
+              Detalles inolvidables para celebrar
+              momentos especiales
             </span>
 
             <span className="hidden font-bold text-amber-300 md:inline">
@@ -387,15 +442,24 @@ export default function Header() {
               </div>
             </Link>
 
-            {/* BUSCADOR */}
+            {/* BUSCADOR ESCRITORIO */}
             <div className="relative z-[90] hidden flex-1 md:block">
               <div className="mx-auto max-w-2xl">
-                <div className="relative">
+                <form
+                  onSubmit={handleSearch}
+                  className="relative"
+                >
                   <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-purple-500" />
 
                   <input
                     type="search"
-                    placeholder="Buscar por producto, regalo, flores, ocasión..."
+                    value={searchQuery}
+                    onChange={(event) =>
+                      setSearchQuery(
+                        event.target.value,
+                      )
+                    }
+                    placeholder="Buscar producto, regalo, ocasión..."
                     onFocus={() => {
                       setActiveCategoryMenu(null);
                       setUserMenuOpen(false);
@@ -403,12 +467,22 @@ export default function Header() {
                     }}
                     onBlur={() =>
                       window.setTimeout(
-                        () => setSearchOpen(false),
+                        () =>
+                          setSearchOpen(false),
                         180,
                       )
                     }
-                    className="w-full rounded-full border border-purple-200 bg-[#fdfbfe] py-2.5 pl-11 pr-5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:bg-white focus:ring-2 focus:ring-purple-100"
+                    className="w-full rounded-full border border-purple-200 bg-[#fdfbfe] py-2.5 pl-11 pr-24 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:bg-white focus:ring-2 focus:ring-purple-100"
                   />
+
+                  {searchQuery && (
+                    <button
+                      type="submit"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-purple-900 px-4 py-2 text-[11px] font-black text-white transition hover:bg-purple-800"
+                    >
+                      Buscar
+                    </button>
+                  )}
 
                   <AnimatePresence>
                     {searchOpen && (
@@ -439,32 +513,43 @@ export default function Header() {
                         </div>
 
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {popularSearches.map((item) => (
-                            <Link
-                              key={item.label}
-                              href={item.href}
-                              onClick={() =>
-                                setSearchOpen(false)
-                              }
-                              className="rounded-full border border-purple-100 bg-purple-50 px-3 py-1.5 text-[11px] font-bold text-purple-800 transition hover:border-purple-300 hover:bg-purple-100"
-                            >
-                              {item.label}
-                            </Link>
-                          ))}
+                          {popularSearches.map(
+                            (item) => (
+                              <Link
+                                key={item.label}
+                                href={item.href}
+                                onClick={() => {
+                                  setSearchOpen(false);
+                                  setSearchQuery(
+                                    item.label,
+                                  );
+                                }}
+                                className="rounded-full border border-purple-100 bg-purple-50 px-3 py-1.5 text-[11px] font-bold text-purple-800 transition hover:border-purple-300 hover:bg-purple-100"
+                              >
+                                {item.label}
+                              </Link>
+                            ),
+                          )}
                         </div>
+
+                        <p className="mt-3 text-[10px] leading-4 text-slate-400">
+                          Puedes buscar por nombre,
+                          categoría, ocasión o
+                          descripción.
+                        </p>
                       </motion.div>
                     )}
                   </AnimatePresence>
-                </div>
+                </form>
               </div>
             </div>
 
             {/* ACCIONES */}
             <div className="ml-auto flex shrink-0 items-center gap-2">
-              {/* CARRITO */}
+              {/* ÚNICO CARRITO */}
               <button
                 type="button"
-                onClick={() => setCartOpen(true)}
+                onClick={openCartDrawer}
                 className="relative flex h-10 w-10 items-center justify-center rounded-full border border-purple-100 bg-white text-purple-900 transition hover:border-purple-200 hover:bg-purple-50"
                 aria-label="Abrir carrito"
               >
@@ -472,7 +557,9 @@ export default function Header() {
 
                 {totalItems > 0 && (
                   <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-black text-purple-950">
-                    {totalItems}
+                    {totalItems > 99
+                      ? "99+"
+                      : totalItems}
                   </span>
                 )}
               </button>
@@ -506,7 +593,9 @@ export default function Header() {
                   <div className="hidden text-left lg:block">
                     <p className="max-w-[110px] truncate text-xs font-black leading-none text-purple-950">
                       {user
-                        ? user.nombre.split(" ")[0]
+                        ? user.nombre.split(
+                            " ",
+                          )[0]
                         : "Usuario"}
                     </p>
 
@@ -551,7 +640,6 @@ export default function Header() {
                     >
                       {user ? (
                         <>
-                          {/* DATOS DEL USUARIO */}
                           <div className="p-4">
                             <div className="flex items-start gap-3">
                               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-purple-950 text-sm font-black uppercase text-amber-300">
@@ -571,7 +659,8 @@ export default function Header() {
                                 </p>
 
                                 <span className="mt-2 inline-flex rounded-full bg-purple-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-purple-700">
-                                  {user.role === "CLIENTE"
+                                  {user.role ===
+                                  "CLIENTE"
                                     ? "Cliente"
                                     : user.role}
                                 </span>
@@ -579,13 +668,15 @@ export default function Header() {
                             </div>
                           </div>
 
-                          {/* OPCIONES */}
                           <div className="border-t border-purple-50">
-                            {user.role === "CLIENTE" && (
+                            {user.role ===
+                              "CLIENTE" && (
                               <Link
                                 href="/pedidos"
                                 onClick={() =>
-                                  setUserMenuOpen(false)
+                                  setUserMenuOpen(
+                                    false,
+                                  )
                                 }
                                 className="flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 transition hover:bg-purple-50 hover:text-purple-950"
                               >
@@ -638,7 +729,9 @@ export default function Header() {
                             <Link
                               href="/login"
                               onClick={() =>
-                                setUserMenuOpen(false)
+                                setUserMenuOpen(
+                                  false,
+                                )
                               }
                               className="block px-4 py-3 text-xs font-bold text-purple-950 transition hover:bg-purple-50"
                             >
@@ -648,7 +741,9 @@ export default function Header() {
                             <Link
                               href="/registro"
                               onClick={() =>
-                                setUserMenuOpen(false)
+                                setUserMenuOpen(
+                                  false,
+                                )
                               }
                               className="block border-t border-purple-50 px-4 py-3 text-xs font-bold text-purple-950 transition hover:bg-purple-50"
                             >
@@ -699,140 +794,150 @@ export default function Header() {
               Todos los productos
             </Link>
 
-            {categoryMenus.map((category) => {
-              const isOpen =
-                activeCategoryMenu ===
-                category.slug;
+            {categoryMenus.map(
+              (category) => {
+                const isOpen =
+                  activeCategoryMenu ===
+                  category.slug;
 
-              return (
-                <div
-                  key={category.slug}
-                  className="relative"
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      toggleCategoryMenu(
-                        category.slug,
-                      )
-                    }
-                    className={`flex items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-bold transition ${
-                      isOpen
-                        ? "bg-purple-900 text-white"
-                        : "text-slate-700 hover:bg-purple-50 hover:text-purple-900"
-                    }`}
+                return (
+                  <div
+                    key={category.slug}
+                    className="relative"
                   >
-                    {category.label}
-
-                    <ChevronDown
-                      className={`h-3.5 w-3.5 transition-transform ${
+                    <button
+                      type="button"
+                      onClick={() =>
+                        toggleCategoryMenu(
+                          category.slug,
+                        )
+                      }
+                      className={`flex items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-bold transition ${
                         isOpen
-                          ? "rotate-180"
-                          : ""
+                          ? "bg-purple-900 text-white"
+                          : "text-slate-700 hover:bg-purple-50 hover:text-purple-900"
                       }`}
-                    />
-                  </button>
+                    >
+                      {category.label}
 
-                  <AnimatePresence>
-                    {isOpen && (
-                      <motion.div
-                        initial={{
-                          opacity: 0,
-                          y: -5,
-                        }}
-                        animate={{
-                          opacity: 1,
-                          y: 0,
-                        }}
-                        exit={{
-                          opacity: 0,
-                          y: -5,
-                        }}
-                        transition={{
-                          duration: 0.15,
-                        }}
-                        className="absolute left-1/2 top-[calc(100%+9px)] z-[80] w-[420px] -translate-x-1/2 overflow-hidden rounded-2xl border border-purple-100 bg-white shadow-2xl"
-                      >
-                        {/* CABECERA */}
-                        <div className="flex items-center justify-between border-b border-purple-100 px-5 py-4">
-                          <div>
-                            <p className="text-[11px] font-black uppercase tracking-[0.08em] text-purple-950">
-                              {category.title}
-                            </p>
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 transition-transform ${
+                          isOpen
+                            ? "rotate-180"
+                            : ""
+                        }`}
+                      />
+                    </button>
 
-                            <p className="mt-1 text-[10px] text-slate-400">
-                              Elige una ocasión especial
-                            </p>
+                    <AnimatePresence>
+                      {isOpen && (
+                        <motion.div
+                          initial={{
+                            opacity: 0,
+                            y: -5,
+                          }}
+                          animate={{
+                            opacity: 1,
+                            y: 0,
+                          }}
+                          exit={{
+                            opacity: 0,
+                            y: -5,
+                          }}
+                          transition={{
+                            duration: 0.15,
+                          }}
+                          className="absolute left-1/2 top-[calc(100%+9px)] z-[80] w-[420px] -translate-x-1/2 overflow-hidden rounded-2xl border border-purple-100 bg-white shadow-2xl"
+                        >
+                          <div className="flex items-center justify-between border-b border-purple-100 px-5 py-4">
+                            <div>
+                              <p className="text-[11px] font-black uppercase tracking-[0.08em] text-purple-950">
+                                {category.title}
+                              </p>
+
+                              <p className="mt-1 text-[10px] text-slate-400">
+                                Elige una ocasión
+                                especial
+                              </p>
+                            </div>
+
+                            <Sparkles className="h-4 w-4 text-amber-500" />
                           </div>
 
-                          <Sparkles className="h-4 w-4 text-amber-500" />
-                        </div>
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1 p-4">
+                            {category.occasions.map(
+                              (occasion) => {
+                                if (
+                                  !occasion.slug
+                                ) {
+                                  return (
+                                    <div
+                                      key={
+                                        occasion.label
+                                      }
+                                      title="Próximamente"
+                                      className="flex cursor-not-allowed items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-slate-400"
+                                    >
+                                      <Heart className="h-3.5 w-3.5 shrink-0 text-purple-200" />
 
-                        {/* OCASIONES */}
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-1 p-4">
-                          {category.occasions.map(
-                            (occasion) => {
-                              if (!occasion.slug) {
+                                      <span>
+                                        {
+                                          occasion.label
+                                        }
+                                      </span>
+                                    </div>
+                                  );
+                                }
+
                                 return (
-                                  <div
-                                    key={occasion.label}
-                                    title="Próximamente"
-                                    className="flex cursor-not-allowed items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-slate-400"
+                                  <Link
+                                    key={
+                                      occasion.label
+                                    }
+                                    href={`/productos?categoria=${category.slug}&ocasion=${occasion.slug}`}
+                                    onClick={() =>
+                                      setActiveCategoryMenu(
+                                        null,
+                                      )
+                                    }
+                                    className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-slate-700 transition hover:bg-purple-50 hover:text-purple-900"
                                   >
-                                    <Heart className="h-3.5 w-3.5 shrink-0 text-purple-200" />
+                                    <Heart className="h-3.5 w-3.5 shrink-0 text-purple-400" />
 
                                     <span>
-                                      {occasion.label}
+                                      {
+                                        occasion.label
+                                      }
                                     </span>
-                                  </div>
+                                  </Link>
                                 );
+                              },
+                            )}
+                          </div>
+
+                          <div className="border-t border-purple-50 bg-purple-50/50 p-3">
+                            <Link
+                              href={`/productos?categoria=${category.slug}`}
+                              onClick={() =>
+                                setActiveCategoryMenu(
+                                  null,
+                                )
                               }
+                              className="flex items-center justify-center gap-2 rounded-xl bg-purple-900 px-4 py-2.5 text-xs font-black text-white transition hover:bg-purple-800"
+                            >
+                              <Gift className="h-4 w-4 text-amber-300" />
 
-                              return (
-                                <Link
-                                  key={occasion.label}
-                                  href={`/productos?categoria=${category.slug}&ocasion=${occasion.slug}`}
-                                  onClick={() =>
-                                    setActiveCategoryMenu(
-                                      null,
-                                    )
-                                  }
-                                  className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-slate-700 transition hover:bg-purple-50 hover:text-purple-900"
-                                >
-                                  <Heart className="h-3.5 w-3.5 shrink-0 text-purple-400" />
-
-                                  <span>
-                                    {occasion.label}
-                                  </span>
-                                </Link>
-                              );
-                            },
-                          )}
-                        </div>
-
-                        {/* VER TODOS */}
-                        <div className="border-t border-purple-50 bg-purple-50/50 p-3">
-                          <Link
-                            href={`/productos?categoria=${category.slug}`}
-                            onClick={() =>
-                              setActiveCategoryMenu(
-                                null,
-                              )
-                            }
-                            className="flex items-center justify-center gap-2 rounded-xl bg-purple-900 px-4 py-2.5 text-xs font-black text-white transition hover:bg-purple-800"
-                          >
-                            <Gift className="h-4 w-4 text-amber-300" />
-
-                            Ver todos en{" "}
-                            {category.label}
-                          </Link>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              );
-            })}
+                              Ver todos en{" "}
+                              {category.label}
+                            </Link>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              },
+            )}
           </div>
         </nav>
 
@@ -858,6 +963,38 @@ export default function Header() {
               className="overflow-hidden border-t border-purple-100 bg-white sm:hidden"
             >
               <nav className="space-y-2 px-5 py-5">
+                <form
+                  onSubmit={
+                    handleMobileSearch
+                  }
+                  className="relative mb-4"
+                >
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-purple-500" />
+
+                  <input
+                    type="search"
+                    value={
+                      mobileSearchQuery
+                    }
+                    onChange={(event) =>
+                      setMobileSearchQuery(
+                        event.target.value,
+                      )
+                    }
+                    placeholder="Buscar productos..."
+                    className="w-full rounded-full border border-purple-200 bg-purple-50 py-3 pl-11 pr-20 text-sm text-slate-700 outline-none focus:border-purple-400 focus:bg-white"
+                  />
+
+                  {mobileSearchQuery && (
+                    <button
+                      type="submit"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-purple-900 px-3 py-2 text-[10px] font-black text-white"
+                    >
+                      Buscar
+                    </button>
+                  )}
+                </form>
+
                 <Link
                   href="/productos"
                   onClick={() =>
@@ -889,7 +1026,7 @@ export default function Header() {
                   type="button"
                   onClick={() => {
                     setMobileOpen(false);
-                    setCartOpen(true);
+                    openCartDrawer();
                   }}
                   className="block w-full rounded-xl px-4 py-3 text-left text-sm font-bold text-purple-950 hover:bg-purple-50"
                 >
@@ -908,11 +1045,14 @@ export default function Header() {
                       </p>
                     </div>
 
-                    {user.role === "CLIENTE" && (
+                    {user.role ===
+                      "CLIENTE" && (
                       <Link
                         href="/pedidos"
                         onClick={() =>
-                          setMobileOpen(false)
+                          setMobileOpen(
+                            false,
+                          )
                         }
                         className="block rounded-xl px-4 py-3 text-sm font-bold text-purple-950 hover:bg-purple-50"
                       >
@@ -957,12 +1097,48 @@ export default function Header() {
         </AnimatePresence>
       </header>
 
-      <CartDrawer
-        open={cartOpen}
-        onClose={() =>
-          setCartOpen(false)
-        }
-      />
+      {/* DRAWER DEL ÚNICO CARRITO */}
+      <CartDrawer />
+
+      {/* NOTIFICACIÓN GLOBAL */}
+      <AnimatePresence>
+        {cartNotification && (
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: 25,
+              scale: 0.96,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              scale: 1,
+            }}
+            exit={{
+              opacity: 0,
+              y: 20,
+              scale: 0.96,
+            }}
+            className="fixed bottom-6 left-1/2 z-[200] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-2xl border border-emerald-200 bg-white p-4 shadow-2xl sm:left-6 sm:translate-x-0"
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                <Check className="h-5 w-5" />
+              </div>
+
+              <div>
+                <p className="font-black text-emerald-700">
+                  ¡Producto agregado!
+                </p>
+
+                <p className="mt-1 text-sm leading-5 text-slate-600">
+                  {cartNotification}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

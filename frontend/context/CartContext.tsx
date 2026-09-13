@@ -5,6 +5,7 @@ import {
   ReactNode,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -28,13 +29,25 @@ type NewCartItem = Omit<CartItem, "cartItemId">;
 type CartContextValue = {
   items: CartItem[];
   totalItems: number;
+
   addItem: (item: NewCartItem) => void;
+
   removeItem: (cartItemId: string) => void;
+
   updateQuantity: (
     cartItemId: string,
     cantidad: number,
   ) => void;
+
   clearCart: () => void;
+
+  isCartDrawerOpen: boolean;
+
+  openCartDrawer: () => void;
+
+  closeCartDrawer: () => void;
+
+  cartNotification: string | null;
 };
 
 const CartContext = createContext<
@@ -61,8 +74,26 @@ export function CartProvider({
 }: {
   children: ReactNode;
 }) {
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [items, setItems] =
+    useState<CartItem[]>([]);
+
+  const [loaded, setLoaded] =
+    useState(false);
+
+  const [
+    isCartDrawerOpen,
+    setIsCartDrawerOpen,
+  ] = useState(false);
+
+  const [
+    cartNotification,
+    setCartNotification,
+  ] = useState<string | null>(null);
+
+  const notificationTimer =
+    useRef<ReturnType<
+      typeof setTimeout
+    > | null>(null);
 
   useEffect(() => {
     const storedCart =
@@ -70,25 +101,28 @@ export function CartProvider({
 
     if (storedCart) {
       try {
-        const parsedCart = JSON.parse(storedCart);
+        const parsedCart =
+          JSON.parse(storedCart);
 
         if (Array.isArray(parsedCart)) {
-          const normalizedCart = parsedCart.map(
-            (item) => ({
+          const normalizedCart =
+            parsedCart.map((item) => ({
               ...item,
+
               cartItemId:
                 item.cartItemId ??
                 createCartItemId(
                   item.productId,
                   item.personalizacion,
                 ),
-            }),
-          );
+            }));
 
           setItems(normalizedCart);
         }
       } catch {
-        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(
+          STORAGE_KEY,
+        );
       }
     }
 
@@ -106,24 +140,58 @@ export function CartProvider({
     );
   }, [items, loaded]);
 
-  function addItem(item: NewCartItem) {
-    const cartItemId = createCartItemId(
-      item.productId,
-      item.personalizacion,
+  useEffect(() => {
+    return () => {
+      if (notificationTimer.current) {
+        clearTimeout(
+          notificationTimer.current,
+        );
+      }
+    };
+  }, []);
+
+  function showNotification(
+    productName: string,
+  ) {
+    setCartNotification(
+      `${productName} se agregó al carrito correctamente.`,
     );
 
-    setItems((currentItems) => {
-      const existingItem = currentItems.find(
-        (currentItem) =>
-          currentItem.cartItemId === cartItemId,
+    if (notificationTimer.current) {
+      clearTimeout(
+        notificationTimer.current,
       );
+    }
+
+    notificationTimer.current =
+      setTimeout(() => {
+        setCartNotification(null);
+      }, 3000);
+  }
+
+  function addItem(item: NewCartItem) {
+    const cartItemId =
+      createCartItemId(
+        item.productId,
+        item.personalizacion,
+      );
+
+    setItems((currentItems) => {
+      const existingItem =
+        currentItems.find(
+          (currentItem) =>
+            currentItem.cartItemId ===
+            cartItemId,
+        );
 
       if (existingItem) {
         return currentItems.map(
           (currentItem) =>
-            currentItem.cartItemId === cartItemId
+            currentItem.cartItemId ===
+            cartItemId
               ? {
                   ...currentItem,
+
                   cantidad:
                     currentItem.cantidad +
                     item.cantidad,
@@ -134,15 +202,27 @@ export function CartProvider({
 
       return [
         ...currentItems,
+
         {
           ...item,
           cartItemId,
         },
       ];
     });
+
+    /*
+     * Cada vez que agregamos un producto:
+     * 1. Se abre el carrito lateral.
+     * 2. Aparece la notificación.
+     */
+    setIsCartDrawerOpen(true);
+
+    showNotification(item.nombre);
   }
 
-  function removeItem(cartItemId: string) {
+  function removeItem(
+    cartItemId: string,
+  ) {
     setItems((currentItems) =>
       currentItems.filter(
         (item) =>
@@ -178,6 +258,14 @@ export function CartProvider({
     setItems([]);
   }
 
+  function openCartDrawer() {
+    setIsCartDrawerOpen(true);
+  }
+
+  function closeCartDrawer() {
+    setIsCartDrawerOpen(false);
+  }
+
   const totalItems = items.reduce(
     (total, item) =>
       total + item.cantidad,
@@ -189,10 +277,22 @@ export function CartProvider({
       value={{
         items,
         totalItems,
+
         addItem,
+
         removeItem,
+
         updateQuantity,
+
         clearCart,
+
+        isCartDrawerOpen,
+
+        openCartDrawer,
+
+        closeCartDrawer,
+
+        cartNotification,
       }}
     >
       {children}
@@ -201,7 +301,8 @@ export function CartProvider({
 }
 
 export function useCart() {
-  const context = useContext(CartContext);
+  const context =
+    useContext(CartContext);
 
   if (!context) {
     throw new Error(
