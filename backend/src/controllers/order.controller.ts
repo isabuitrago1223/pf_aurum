@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../config/prisma.js';
 import type { AuthenticatedRequest } from '../middlewares/auth.middleware.js';
 import { sendOrderConfirmationEmail } from '../services/mail.service.js';
+import { createOrderReceiptPdf } from '../services/order-receipt.service.js';
 import { AppError } from '../utils/app-error.js';
 
 const createOrderSchema = z.object({
@@ -110,8 +111,6 @@ export async function createOrder(
     };
   });
 
-  // El costo de envio se mantiene en 0 hasta definir
-  // las tarifas de domicilio del negocio.
   const costoEnvio = 0;
   const descuento = 0;
   const total = subtotal + costoEnvio - descuento;
@@ -281,6 +280,109 @@ export async function getMyOrderById(
   });
 }
 
+export async function getMyOrderReceipt(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  if (!req.auth) {
+    throw new AppError(401, 'Autenticacion requerida.');
+  }
+
+  const orderId = String(req.params.id);
+
+  const order = await prisma.order.findFirst({
+    where: {
+      id: orderId,
+      userId: req.auth.userId
+    },
+    include: {
+      items: true,
+      payments: {
+        orderBy: {
+          createdAt: 'desc'
+        },
+        take: 1
+      }
+    }
+  });
+
+  if (!order) {
+    throw new AppError(
+      404,
+      'Pedido no encontrado.'
+    );
+  }
+
+  const latestPayment = order.payments[0] ?? null;
+
+  const document = createOrderReceiptPdf({
+    id: order.id,
+    numeroPedido: order.numeroPedido,
+    estado: order.estado,
+    createdAt: order.createdAt,
+
+    nombreContacto: order.nombreContacto,
+    cedulaContacto: order.cedulaContacto,
+    emailContacto: order.emailContacto,
+    telefonoContacto: order.telefonoContacto,
+
+    metodoEntrega: order.metodoEntrega,
+
+    direccionEntrega: order.direccionEntrega,
+    barrioEntrega: order.barrioEntrega,
+    ciudadEntrega: order.ciudadEntrega,
+    departamentoEntrega: order.departamentoEntrega,
+    notasEntrega: order.notasEntrega,
+
+    direccionRecogida: order.direccionRecogida,
+    fechaRecogida: order.fechaRecogida,
+    horaRecogida: order.horaRecogida,
+
+    subtotal: Number(order.subtotal),
+    costoEnvio: Number(order.costoEnvio),
+    descuento: Number(order.descuento),
+    total: Number(order.total),
+
+    items: order.items.map((item) => ({
+      nombreProducto: item.nombreProducto,
+      cantidad: item.cantidad,
+      precioUnitario: Number(item.precioUnitario),
+      descuentoUnitario: Number(item.descuentoUnitario),
+      personalizacion: item.personalizacion
+    })),
+
+    pago: latestPayment
+      ? {
+          metodo: latestPayment.metodo,
+          estado: latestPayment.estado,
+          monto: Number(latestPayment.monto),
+          referencia: latestPayment.referencia,
+          proveedorTransaccion:
+            latestPayment.proveedorTransaccion,
+          pagadoAt: latestPayment.pagadoAt
+        }
+      : null
+  });
+
+  const fileName =
+    `comprobante-${order.numeroPedido}.pdf`;
+
+  res.status(200);
+
+  res.setHeader(
+    'Content-Type',
+    'application/pdf'
+  );
+
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${fileName}"`
+  );
+
+  document.pipe(res);
+  document.end();
+}
+
 export async function listAllOrders(
   _req: AuthenticatedRequest,
   res: Response
@@ -317,11 +419,15 @@ const updateOrderStatusSchema = z.object({
   ]),
   motivoCancelacion: z.string().trim().min(5).max(500).optional()
 }).superRefine((data, ctx) => {
-  if (data.estado === 'CANCELADO' && !data.motivoCancelacion) {
+  if (
+    data.estado === 'CANCELADO' &&
+    !data.motivoCancelacion
+  ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['motivoCancelacion'],
-      message: 'El motivo de cancelacion es requerido.'
+      message:
+        'El motivo de cancelacion es requerido.'
     });
   }
 });
@@ -331,7 +437,9 @@ export async function updateOrderStatus(
   res: Response
 ) {
   const orderId = String(req.params.id);
-  const data = updateOrderStatusSchema.parse(req.body);
+  const data = updateOrderStatusSchema.parse(
+    req.body
+  );
 
   const order = await prisma.order.findUnique({
     where: {
@@ -356,66 +464,85 @@ export async function updateOrderStatus(
     );
   }
 
-  if (order.estado === 'ENTREGADO' && data.estado === 'CANCELADO') {
+  if (
+    order.estado === 'ENTREGADO' &&
+    data.estado === 'CANCELADO'
+  ) {
     throw new AppError(
       409,
       'No es posible cancelar un pedido entregado.'
     );
   }
 
-  const validTransitions: Record<string, string[]> = {
-    PENDIENTE: ['EN_PREPARACION', 'CANCELADO'],
-    EN_PREPARACION: ['EN_CAMINO', 'CANCELADO'],
-    EN_CAMINO: ['ENTREGADO', 'CANCELADO'],
-    ENTREGADO: [],
-    CANCELADO: []
-  };
+  const validTransitions:
+    Record<string, string[]> = {
+      PENDIENTE: [
+        'EN_PREPARACION',
+        'CANCELADO'
+      ],
+      EN_PREPARACION: [
+        'EN_CAMINO',
+        'CANCELADO'
+      ],
+      EN_CAMINO: [
+        'ENTREGADO',
+        'CANCELADO'
+      ],
+      ENTREGADO: [],
+      CANCELADO: []
+    };
 
-  const allowedNextStates = validTransitions[order.estado] ?? [];
+  const allowedNextStates =
+    validTransitions[order.estado] ?? [];
 
-  if (!allowedNextStates.includes(data.estado)) {
+  if (
+    !allowedNextStates.includes(data.estado)
+  ) {
     throw new AppError(
       409,
       `No es posible cambiar el pedido de ${order.estado} a ${data.estado}.`
     );
   }
 
-  const updatedOrder = await prisma.$transaction(async (tx) => {
-    if (data.estado === 'CANCELADO') {
-      for (const item of order.items) {
-        await tx.product.update({
-          where: {
-            id: item.productId
-          },
-          data: {
-            stock: {
-              increment: item.cantidad
+  const updatedOrder =
+    await prisma.$transaction(async (tx) => {
+      if (data.estado === 'CANCELADO') {
+        for (const item of order.items) {
+          await tx.product.update({
+            where: {
+              id: item.productId
+            },
+            data: {
+              stock: {
+                increment: item.cantidad
+              }
             }
-          }
-        });
+          });
+        }
       }
-    }
 
-    return tx.order.update({
-      where: {
-        id: orderId
-      },
-      data: {
-        estado: data.estado,
-        motivoCancelacion:
-          data.estado === 'CANCELADO'
-            ? data.motivoCancelacion
-            : null,
-        canceladoAt:
-          data.estado === 'CANCELADO'
-            ? new Date()
-            : null
-      },
-      include: {
-        items: true
-      }
+      return tx.order.update({
+        where: {
+          id: orderId
+        },
+        data: {
+          estado: data.estado,
+
+          motivoCancelacion:
+            data.estado === 'CANCELADO'
+              ? data.motivoCancelacion
+              : null,
+
+          canceladoAt:
+            data.estado === 'CANCELADO'
+              ? new Date()
+              : null
+        },
+        include: {
+          items: true
+        }
+      });
     });
-  });
 
   return res.status(200).json({
     message:
