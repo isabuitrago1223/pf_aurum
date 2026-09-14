@@ -150,6 +150,54 @@ const passwordRecoveryRateLimit = rateLimit({
  *         description: Datos de inicio de sesion invalidos
  *       401:
  *         description: Correo o contrasena incorrectos
+ *       403:
+ *         description: La cuenta se encuentra suspendida
+ *       429:
+ *         description: Demasiados intentos de inicio de sesion
+ */
+
+/**
+ * @openapi
+ * /api/auth/google:
+ *   post:
+ *     tags:
+ *       - Autenticacion
+ *     summary: Iniciar sesion o registrarse con Google
+ *     description: Valida una credencial de Google. Si el cliente ya existe, inicia sesion. Si no existe, crea una cuenta CLIENTE siempre que acepte los consentimientos requeridos.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - credential
+ *             properties:
+ *               credential:
+ *                 type: string
+ *                 description: ID token emitido por Google.
+ *                 example: credencial_google_id_token
+ *               acceptedTerms:
+ *                 type: boolean
+ *                 description: Requerido para crear una cuenta nueva con Google.
+ *                 example: true
+ *               acceptedPrivacy:
+ *                 type: boolean
+ *                 description: Requerido para crear una cuenta nueva con Google.
+ *                 example: true
+ *               acceptedDataPolicy:
+ *                 type: boolean
+ *                 description: Requerido para crear una cuenta nueva con Google.
+ *                 example: true
+ *     responses:
+ *       200:
+ *         description: Autenticacion con Google correcta
+ *       400:
+ *         description: Credencial o datos invalidos, o faltan consentimientos para crear la cuenta
+ *       403:
+ *         description: Cuenta suspendida o acceso con Google no permitido para el rol del usuario
+ *       409:
+ *         description: El correo ya esta vinculado a otra cuenta de Google
  *       429:
  *         description: Demasiados intentos de inicio de sesion
  */
@@ -233,6 +281,8 @@ const passwordRecoveryRateLimit = rateLimit({
  *         description: Ruta protegida accesible
  *       401:
  *         description: Autenticacion requerida, sesion invalida o expirada
+ *       403:
+ *         description: La cuenta se encuentra suspendida
  */
 
 /**
@@ -251,7 +301,7 @@ const passwordRecoveryRateLimit = rateLimit({
  *       401:
  *         description: Autenticacion requerida, sesion invalida o expirada
  *       403:
- *         description: El usuario no tiene permisos de administrador
+ *         description: Cuenta suspendida o usuario sin permisos de administrador
  */
 
 authRouter.post(
