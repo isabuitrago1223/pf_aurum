@@ -131,6 +131,13 @@ export async function login(req: Request, res: Response) {
     );
   }
 
+  if (user.estado === 'SUSPENDIDO') {
+    throw new AppError(
+      403,
+      'La cuenta se encuentra suspendida.'
+    );
+  }
+
   const token = signAccessToken({
     sub: user.id,
     role: user.role
