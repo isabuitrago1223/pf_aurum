@@ -3,6 +3,7 @@ import { Router } from 'express';
 import {
   createOrder,
   getMyOrderById,
+  getMyOrderReceipt,
   listAllOrders,
   listMyOrders,
   updateOrderStatus
@@ -31,7 +32,7 @@ export const orderRouter = Router();
  *       200:
  *         description: Lista de pedidos obtenida correctamente.
  *       401:
- *         description: Autenticación requerida o sesión inválida.
+ *         description: Autenticacion requerida o sesion invalida.
  *       403:
  *         description: El usuario no tiene rol CLIENTE.
  */
@@ -49,14 +50,14 @@ orderRouter.get(
  *     tags:
  *       - Pedidos
  *     summary: Obtener todos los pedidos
- *     description: Retorna todos los pedidos registrados junto con información básica del cliente. Requiere rol ADMIN.
+ *     description: Retorna todos los pedidos registrados junto con informacion basica del cliente. Requiere rol ADMIN.
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Lista completa de pedidos obtenida correctamente.
  *       401:
- *         description: Autenticación requerida o sesión inválida.
+ *         description: Autenticacion requerida o sesion invalida.
  *       403:
  *         description: El usuario no tiene permisos de administrador.
  */
@@ -74,7 +75,7 @@ orderRouter.get(
  *     tags:
  *       - Pedidos
  *     summary: Actualizar estado de un pedido
- *     description: Cambia el estado de un pedido según las transiciones permitidas. Requiere rol ADMIN.
+ *     description: Cambia el estado de un pedido segun las transiciones permitidas. Requiere rol ADMIN.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -106,26 +107,65 @@ orderRouter.get(
  *                 type: string
  *                 minLength: 5
  *                 maxLength: 500
- *                 example: El cliente solicitó cancelar el pedido.
+ *                 example: El cliente solicito cancelar el pedido.
  *     responses:
  *       200:
  *         description: Estado del pedido actualizado correctamente.
  *       400:
- *         description: Datos del estado inválidos o falta motivo de cancelación.
+ *         description: Datos del estado invalidos o falta motivo de cancelacion.
  *       401:
- *         description: Autenticación requerida o sesión inválida.
+ *         description: Autenticacion requerida o sesion invalida.
  *       403:
  *         description: El usuario no tiene permisos de administrador.
  *       404:
  *         description: Pedido no encontrado.
  *       409:
- *         description: Transición de estado no permitida o pedido ya cancelado.
+ *         description: Transicion de estado no permitida o pedido ya cancelado.
  */
 orderRouter.patch(
   '/admin/:id/status',
   requireAuth,
   requireRole('ADMIN'),
   asyncHandler(updateOrderStatus)
+);
+
+/**
+ * @openapi
+ * /api/orders/{id}/receipt:
+ *   get:
+ *     tags:
+ *       - Pedidos
+ *     summary: Descargar comprobante de compra
+ *     description: Genera y descarga un comprobante PDF del pedido si pertenece al cliente autenticado.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del pedido.
+ *     responses:
+ *       200:
+ *         description: Comprobante PDF generado correctamente.
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       401:
+ *         description: Autenticacion requerida o sesion invalida.
+ *       403:
+ *         description: El usuario no tiene rol CLIENTE.
+ *       404:
+ *         description: Pedido no encontrado.
+ */
+orderRouter.get(
+  '/:id/receipt',
+  requireAuth,
+  requireRole('CLIENTE'),
+  asyncHandler(getMyOrderReceipt)
 );
 
 /**
@@ -149,7 +189,7 @@ orderRouter.patch(
  *       200:
  *         description: Pedido obtenido correctamente.
  *       401:
- *         description: Autenticación requerida o sesión inválida.
+ *         description: Autenticacion requerida o sesion invalida.
  *       403:
  *         description: El usuario no tiene rol CLIENTE.
  *       404:
@@ -217,7 +257,7 @@ orderRouter.get(
  *               barrioEntrega:
  *                 type: string
  *                 maxLength: 80
- *                 example: Niquía
+ *                 example: Niquia
  *               ciudadEntrega:
  *                 type: string
  *                 maxLength: 80
@@ -229,7 +269,7 @@ orderRouter.get(
  *               notasEntrega:
  *                 type: string
  *                 maxLength: 500
- *                 example: Entregar en recepción.
+ *                 example: Entregar en recepcion.
  *               items:
  *                 type: array
  *                 minItems: 1
@@ -248,20 +288,20 @@ orderRouter.get(
  *                       example: 1
  *                     personalizacion:
  *                       nullable: true
- *                       description: Datos opcionales de personalización del producto.
+ *                       description: Datos opcionales de personalizacion del producto.
  *     responses:
  *       201:
  *         description: Pedido creado correctamente.
  *       400:
- *         description: Datos inválidos o dirección incompleta para entrega a domicilio.
+ *         description: Datos invalidos o direccion incompleta para entrega a domicilio.
  *       401:
- *         description: Autenticación requerida o sesión inválida.
+ *         description: Autenticacion requerida o sesion invalida.
  *       403:
  *         description: El usuario no tiene rol CLIENTE.
  *       404:
- *         description: Uno o más productos no existen o no están disponibles.
+ *         description: Uno o mas productos no existen o no estan disponibles.
  *       409:
- *         description: Stock insuficiente o el stock cambió durante la operación.
+ *         description: Stock insuficiente o el stock cambio durante la operacion.
  */
 orderRouter.post(
   '/',
