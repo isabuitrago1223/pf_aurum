@@ -8,6 +8,7 @@ const schema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default('1h'),
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   CLOUDINARY_CLOUD_NAME: z.string().min(1),
   CLOUDINARY_API_KEY: z.string().min(1),
   CLOUDINARY_API_SECRET: z.string().min(1),
