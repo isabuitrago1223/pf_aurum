@@ -3,6 +3,7 @@ import rateLimit from 'express-rate-limit';
 
 import {
   forgotPassword,
+  googleLogin,
   login,
   register,
   resetPassword
@@ -262,6 +263,12 @@ authRouter.post(
   '/login',
   loginRateLimit,
   asyncHandler(login)
+);
+
+authRouter.post(
+  '/google',
+  loginRateLimit,
+  asyncHandler(googleLogin)
 );
 
 authRouter.post(
