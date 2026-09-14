@@ -9,6 +9,7 @@ import { swaggerSpec } from './config/swagger.js';
 
 import { errorHandler } from './middlewares/error.middleware.js';
 
+import { adminDashboardRouter } from './routes/admin-dashboard.routes.js';
 import { authRouter } from './routes/auth.routes.js';
 import { categoryRouter } from './routes/category.routes.js';
 import { clientRouter } from './routes/client.routes.js';
@@ -47,6 +48,8 @@ app.use(
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use('/api/health', healthRouter);
+
+app.use('/api/admin/dashboard', adminDashboardRouter);
 
 app.use('/api/categories', categoryRouter);
 
