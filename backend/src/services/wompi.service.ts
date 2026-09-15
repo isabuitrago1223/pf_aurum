@@ -107,3 +107,39 @@ export async function getWompiTransaction(transactionId: string) {
     }
   );
 }
+
+export interface WompiMerchantInfo {
+  data: {
+    presigned_acceptance: {
+      acceptance_token: string;
+      permalink: string;
+      type: string;
+    };
+    presigned_personal_data_auth: {
+      acceptance_token: string;
+      permalink: string;
+      type: string;
+    };
+  };
+}
+
+export async function getWompiMerchantInfo() {
+  const response = await fetch(`${WOMPI_BASE_URL}/merchants/info`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      'x-merchant-public-key': env.WOMPI_PUBLIC_KEY
+    }
+  });
+
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new AppError(
+      502,
+      `Wompi rechazo la solicitud con estado ${response.status}.`
+    );
+  }
+
+  return body as WompiMerchantInfo;
+}

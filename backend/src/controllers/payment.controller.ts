@@ -4,7 +4,10 @@ import { z } from 'zod';
 import { env } from '../config/env.js';
 import { prisma } from '../config/prisma.js';
 import type { AuthenticatedRequest } from '../middlewares/auth.middleware.js';
-import { createWompiTransaction } from '../services/wompi.service.js';
+import {
+  createWompiTransaction,
+  getWompiMerchantInfo
+} from '../services/wompi.service.js';
 import { AppError } from '../utils/app-error.js';
 
 type WompiEventData = Record<string, unknown>;
@@ -102,6 +105,24 @@ const createPaymentSchema = z.object({
   ])
 });
 
+export async function getWompiAcceptanceData(
+  _req: Request,
+  res: Response
+) {
+  const merchantInfo = await getWompiMerchantInfo();
+
+  return res.status(200).json({
+    acceptanceToken:
+      merchantInfo.data.presigned_acceptance.acceptance_token,
+    acceptancePermalink:
+      merchantInfo.data.presigned_acceptance.permalink,
+    personalDataAuthToken:
+      merchantInfo.data.presigned_personal_data_auth.acceptance_token,
+    personalDataAuthPermalink:
+      merchantInfo.data.presigned_personal_data_auth.permalink
+  });
+}
+
 const createWompiPaymentSchema = z.object({
   orderId: z.string().min(1),
   metodo: z.enum([
@@ -114,6 +135,7 @@ const createWompiPaymentSchema = z.object({
   acceptPersonalAuth: z.string().min(1),
   paymentMethod: z.record(z.unknown())
 });
+
 const updatePaymentStatusSchema = z.object({
   estado: z.enum([
     'PENDIENTE',
@@ -344,17 +366,33 @@ export async function handleWompiWebhook(
         ? 'RECHAZADO'
         : 'PENDIENTE';
 
-  const updatedPayment = await prisma.payment.update({
-    where: {
-      id: payment.id
-    },
-    data: {
-      estado: newStatus,
-      respuestaPasarela: JSON.parse(JSON.stringify(body)),
-      ...(newStatus === 'APROBADO' && !payment.pagadoAt
-        ? { pagadoAt: new Date() }
-        : {})
+  const updatedPayment = await prisma.$transaction(async (tx) => {
+    const updated = await tx.payment.update({
+      where: {
+        id: payment.id
+      },
+      data: {
+        estado: newStatus,
+        respuestaPasarela: JSON.parse(JSON.stringify(body)),
+        ...(newStatus === 'APROBADO' && !payment.pagadoAt
+          ? { pagadoAt: new Date() }
+          : {})
+      }
+    });
+
+    if (newStatus === 'APROBADO') {
+      await tx.order.updateMany({
+        where: {
+          id: payment.orderId,
+          estado: 'PENDIENTE'
+        },
+        data: {
+          estado: 'EN_PREPARACION'
+        }
+      });
     }
+
+    return updated;
   });
 
   return res.status(200).json({
@@ -433,4 +471,3 @@ export async function updateAdminPaymentStatus(
     payment
   });
 }
-

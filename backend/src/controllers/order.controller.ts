@@ -3,7 +3,66 @@ import { z } from 'zod';
 
 import { prisma } from '../config/prisma.js';
 import type { AuthenticatedRequest } from '../middlewares/auth.middleware.js';
+import { sendOrderConfirmationEmail } from '../services/mail.service.js';
+import { createOrderReceiptPdf } from '../services/order-receipt.service.js';
 import { AppError } from '../utils/app-error.js';
+
+function normalizeDeliveryLocation(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function calculateDeliveryCost(
+  metodoEntrega: 'DOMICILIO' | 'TIENDA',
+  departamento?: string,
+  ciudad?: string,
+  barrio?: string
+) {
+  if (metodoEntrega === 'TIENDA') {
+    return 0;
+  }
+
+  if (!departamento || !ciudad || !barrio) {
+    throw new AppError(
+      400,
+      'La ubicacion completa es requerida para calcular el domicilio.'
+    );
+  }
+
+  const department = normalizeDeliveryLocation(departamento);
+  const city = normalizeDeliveryLocation(ciudad);
+  const neighborhood = normalizeDeliveryLocation(barrio);
+
+  if (department !== 'antioquia') {
+    throw new AppError(
+      400,
+      'El costo de domicilio fuera de Antioquia debe ser confirmado.'
+    );
+  }
+
+  if (city === 'bello' && neighborhood === 'niquia') {
+    return 5000;
+  }
+
+  if (city === 'bello') {
+    return 7000;
+  }
+
+  if (city === 'medellin') {
+    return 10000;
+  }
+
+  if (
+    ['copacabana', 'itagui', 'envigado', 'sabaneta'].includes(city)
+  ) {
+    return 12000;
+  }
+
+  return 15000;
+}
 
 const createOrderSchema = z.object({
   metodoEntrega: z.enum(['DOMICILIO', 'TIENDA']),
@@ -109,9 +168,12 @@ export async function createOrder(
     };
   });
 
-  // El costo de envio se mantiene en 0 hasta definir
-  // las tarifas de domicilio del negocio.
-  const costoEnvio = 0;
+  const costoEnvio = calculateDeliveryCost(
+    data.metodoEntrega,
+    data.departamentoEntrega,
+    data.ciudadEntrega,
+    data.barrioEntrega
+  );
   const descuento = 0;
   const total = subtotal + costoEnvio - descuento;
 
@@ -190,6 +252,33 @@ export async function createOrder(
     });
   });
 
+  try {
+    await sendOrderConfirmationEmail({
+      to: order.emailContacto,
+      nombre: order.nombreContacto,
+      numeroPedido: order.numeroPedido,
+      metodoEntrega: order.metodoEntrega,
+      direccionEntrega: order.direccionEntrega,
+      barrioEntrega: order.barrioEntrega,
+      ciudadEntrega: order.ciudadEntrega,
+      departamentoEntrega: order.departamentoEntrega,
+      subtotal: Number(order.subtotal),
+      costoEnvio: Number(order.costoEnvio),
+      descuento: Number(order.descuento),
+      total: Number(order.total),
+      items: order.items.map((item) => ({
+        nombreProducto: item.nombreProducto,
+        cantidad: item.cantidad,
+        precioUnitario: Number(item.precioUnitario)
+      }))
+    });
+  } catch (error) {
+    console.error(
+      `No fue posible enviar la confirmacion del pedido ${order.numeroPedido}.`,
+      error
+    );
+  }
+
   return res.status(201).json({
     message: 'Pedido creado correctamente.',
     order
@@ -230,7 +319,7 @@ export async function getMyOrderById(
   }
 
   const orderId = String(req.params.id);
-  
+
   const order = await prisma.order.findFirst({
     where: {
       id: orderId,
@@ -251,6 +340,109 @@ export async function getMyOrderById(
   return res.status(200).json({
     order
   });
+}
+
+export async function getMyOrderReceipt(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  if (!req.auth) {
+    throw new AppError(401, 'Autenticacion requerida.');
+  }
+
+  const orderId = String(req.params.id);
+
+  const order = await prisma.order.findFirst({
+    where: {
+      id: orderId,
+      userId: req.auth.userId
+    },
+    include: {
+      items: true,
+      payments: {
+        orderBy: {
+          createdAt: 'desc'
+        },
+        take: 1
+      }
+    }
+  });
+
+  if (!order) {
+    throw new AppError(
+      404,
+      'Pedido no encontrado.'
+    );
+  }
+
+  const latestPayment = order.payments[0] ?? null;
+
+  const document = createOrderReceiptPdf({
+    id: order.id,
+    numeroPedido: order.numeroPedido,
+    estado: order.estado,
+    createdAt: order.createdAt,
+
+    nombreContacto: order.nombreContacto,
+    cedulaContacto: order.cedulaContacto,
+    emailContacto: order.emailContacto,
+    telefonoContacto: order.telefonoContacto,
+
+    metodoEntrega: order.metodoEntrega,
+
+    direccionEntrega: order.direccionEntrega,
+    barrioEntrega: order.barrioEntrega,
+    ciudadEntrega: order.ciudadEntrega,
+    departamentoEntrega: order.departamentoEntrega,
+    notasEntrega: order.notasEntrega,
+
+    direccionRecogida: order.direccionRecogida,
+    fechaRecogida: order.fechaRecogida,
+    horaRecogida: order.horaRecogida,
+
+    subtotal: Number(order.subtotal),
+    costoEnvio: Number(order.costoEnvio),
+    descuento: Number(order.descuento),
+    total: Number(order.total),
+
+    items: order.items.map((item) => ({
+      nombreProducto: item.nombreProducto,
+      cantidad: item.cantidad,
+      precioUnitario: Number(item.precioUnitario),
+      descuentoUnitario: Number(item.descuentoUnitario),
+      personalizacion: item.personalizacion
+    })),
+
+    pago: latestPayment
+      ? {
+          metodo: latestPayment.metodo,
+          estado: latestPayment.estado,
+          monto: Number(latestPayment.monto),
+          referencia: latestPayment.referencia,
+          proveedorTransaccion:
+            latestPayment.proveedorTransaccion,
+          pagadoAt: latestPayment.pagadoAt
+        }
+      : null
+  });
+
+  const fileName =
+    `comprobante-${order.numeroPedido}.pdf`;
+
+  res.status(200);
+
+  res.setHeader(
+    'Content-Type',
+    'application/pdf'
+  );
+
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${fileName}"`
+  );
+
+  document.pipe(res);
+  document.end();
 }
 
 export async function listAllOrders(
@@ -289,11 +481,15 @@ const updateOrderStatusSchema = z.object({
   ]),
   motivoCancelacion: z.string().trim().min(5).max(500).optional()
 }).superRefine((data, ctx) => {
-  if (data.estado === 'CANCELADO' && !data.motivoCancelacion) {
+  if (
+    data.estado === 'CANCELADO' &&
+    !data.motivoCancelacion
+  ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['motivoCancelacion'],
-      message: 'El motivo de cancelacion es requerido.'
+      message:
+        'El motivo de cancelacion es requerido.'
     });
   }
 });
@@ -303,7 +499,9 @@ export async function updateOrderStatus(
   res: Response
 ) {
   const orderId = String(req.params.id);
-  const data = updateOrderStatusSchema.parse(req.body);
+  const data = updateOrderStatusSchema.parse(
+    req.body
+  );
 
   const order = await prisma.order.findUnique({
     where: {
@@ -328,66 +526,85 @@ export async function updateOrderStatus(
     );
   }
 
-  if (order.estado === 'ENTREGADO' && data.estado === 'CANCELADO') {
+  if (
+    order.estado === 'ENTREGADO' &&
+    data.estado === 'CANCELADO'
+  ) {
     throw new AppError(
       409,
       'No es posible cancelar un pedido entregado.'
     );
   }
 
-  const validTransitions: Record<string, string[]> = {
-    PENDIENTE: ['EN_PREPARACION', 'CANCELADO'],
-    EN_PREPARACION: ['EN_CAMINO', 'CANCELADO'],
-    EN_CAMINO: ['ENTREGADO', 'CANCELADO'],
-    ENTREGADO: [],
-    CANCELADO: []
-  };
+  const validTransitions:
+    Record<string, string[]> = {
+      PENDIENTE: [
+        'EN_PREPARACION',
+        'CANCELADO'
+      ],
+      EN_PREPARACION: [
+        'EN_CAMINO',
+        'CANCELADO'
+      ],
+      EN_CAMINO: [
+        'ENTREGADO',
+        'CANCELADO'
+      ],
+      ENTREGADO: [],
+      CANCELADO: []
+    };
 
-  const allowedNextStates = validTransitions[order.estado] ?? [];
+  const allowedNextStates =
+    validTransitions[order.estado] ?? [];
 
-  if (!allowedNextStates.includes(data.estado)) {
+  if (
+    !allowedNextStates.includes(data.estado)
+  ) {
     throw new AppError(
       409,
       `No es posible cambiar el pedido de ${order.estado} a ${data.estado}.`
     );
   }
 
-  const updatedOrder = await prisma.$transaction(async (tx) => {
-    if (data.estado === 'CANCELADO') {
-      for (const item of order.items) {
-        await tx.product.update({
-          where: {
-            id: item.productId
-          },
-          data: {
-            stock: {
-              increment: item.cantidad
+  const updatedOrder =
+    await prisma.$transaction(async (tx) => {
+      if (data.estado === 'CANCELADO') {
+        for (const item of order.items) {
+          await tx.product.update({
+            where: {
+              id: item.productId
+            },
+            data: {
+              stock: {
+                increment: item.cantidad
+              }
             }
-          }
-        });
+          });
+        }
       }
-    }
 
-    return tx.order.update({
-      where: {
-        id: orderId
-      },
-      data: {
-        estado: data.estado,
-        motivoCancelacion:
-          data.estado === 'CANCELADO'
-            ? data.motivoCancelacion
-            : null,
-        canceladoAt:
-          data.estado === 'CANCELADO'
-            ? new Date()
-            : null
-      },
-      include: {
-        items: true
-      }
+      return tx.order.update({
+        where: {
+          id: orderId
+        },
+        data: {
+          estado: data.estado,
+
+          motivoCancelacion:
+            data.estado === 'CANCELADO'
+              ? data.motivoCancelacion
+              : null,
+
+          canceladoAt:
+            data.estado === 'CANCELADO'
+              ? new Date()
+              : null
+        },
+        include: {
+          items: true
+        }
+      });
     });
-  });
 
   return res.status(200).json({
     message:
