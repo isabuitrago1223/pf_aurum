@@ -1,21 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import {
   ArrowLeft,
-  CalendarDays,
   Eye,
   EyeOff,
-  Home,
   LockKeyhole,
   Mail,
-  MapPin,
   Phone,
   Sparkles,
   User,
   X,
 } from "lucide-react";
+
+import GoogleAuthButton from "../components/auth/GoogleAuthButton";
 
 type RegisterResponse = {
   token: string;
@@ -27,58 +27,51 @@ type RegisterResponse = {
   };
 };
 
-function GoogleIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      aria-hidden="true"
-    >
-      <path
-        fill="#4285F4"
-        d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.91h5.38a4.6 4.6 0 0 1-1.99 3.02v2.51h3.22c1.88-1.73 2.99-4.29 2.99-7.37Z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 22c2.7 0 4.96-.89 6.61-2.4l-3.22-2.51c-.89.6-2.03.96-3.39.96-2.6 0-4.8-1.75-5.59-4.11H3.08v2.59A10 10 0 0 0 12 22Z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M6.41 13.94A6.02 6.02 0 0 1 6.1 12c0-.67.11-1.32.31-1.94V7.47H3.08A10 10 0 0 0 2 12c0 1.61.39 3.13 1.08 4.53l3.33-2.59Z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 5.95c1.47 0 2.78.5 3.82 1.49l2.86-2.86C16.95 2.97 14.69 2 12 2a10 10 0 0 0-8.92 5.47l3.33 2.59C7.2 7.7 9.4 5.95 12 5.95Z"
-      />
-    </svg>
-  );
-}
+type ErrorResponse = {
+  message?: string;
+  error?: string;
+};
 
 export default function RegisterPage() {
+  const router = useRouter();
+
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
-  const [cedula, setCedula] = useState("");
-  const [telefono, setTelefono] = useState("");
-  const [direccion, setDireccion] = useState("");
-  const [barrio, setBarrio] = useState("");
-  const [ciudad, setCiudad] = useState("");
-  const [departamento, setDepartamento] = useState("");
-  const [fechaNacimiento, setFechaNacimiento] = useState("");
   const [email, setEmail] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [documento, setDocumento] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] =
+    useState("");
 
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
-  const [acceptedDataPolicy, setAcceptedDataPolicy] =
+  const [showPassword, setShowPassword] =
+    useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] =
+  const [acceptedTerms, setAcceptedTerms] =
+    useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] =
+    useState(false);
+  const [acceptedDataPolicy, setAcceptedDataPolicy] =
     useState(false);
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] =
+    useState(false);
+
+  function saveSession(data: RegisterResponse) {
+    localStorage.setItem("aurum_token", data.token);
+
+    localStorage.setItem(
+      "aurum_user",
+      JSON.stringify(data.user),
+    );
+
+    router.push("/");
+    router.refresh();
+  }
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -89,6 +82,17 @@ export default function RegisterPage() {
 
     if (password !== confirmPassword) {
       setError("Las contraseñas no coinciden.");
+      return;
+    }
+
+    if (
+      !acceptedTerms ||
+      !acceptedPrivacy ||
+      !acceptedDataPolicy
+    ) {
+      setError(
+        "Debes aceptar los términos, la política de privacidad y la política de tratamiento de datos.",
+      );
       return;
     }
 
@@ -109,14 +113,9 @@ export default function RegisterPage() {
           body: JSON.stringify({
             nombre,
             apellido,
-            cedula,
-            telefono,
-            direccion,
-            barrio,
-            ciudad,
-            departamento,
-            fechaNacimiento,
             email,
+            telefono,
+            documento,
             password,
             acceptedTerms,
             acceptedPrivacy,
@@ -126,15 +125,34 @@ export default function RegisterPage() {
       );
 
       if (!response.ok) {
+        let errorData: ErrorResponse = {};
+
+        try {
+          errorData = await response.json();
+        } catch {
+          // El backend puede responder sin JSON.
+        }
+
         if (response.status === 409) {
           setError(
-            "El correo o la cédula ya están registrados.",
+            errorData.message ??
+              errorData.error ??
+              "Ya existe una cuenta con estos datos.",
+          );
+          return;
+        }
+
+        if (response.status === 429) {
+          setError(
+            "Has realizado demasiados intentos. Espera unos minutos e inténtalo nuevamente.",
           );
           return;
         }
 
         setError(
-          "No fue posible completar el registro.",
+          errorData.message ??
+            errorData.error ??
+            "No fue posible crear la cuenta.",
         );
         return;
       }
@@ -142,49 +160,130 @@ export default function RegisterPage() {
       const data: RegisterResponse =
         await response.json();
 
-      localStorage.setItem(
-        "aurum_token",
-        data.token,
-      );
-
-      localStorage.setItem(
-        "aurum_user",
-        JSON.stringify(data.user),
-      );
-
-      window.location.href = "/";
+      saveSession(data);
     } catch {
       setError(
-        "No fue posible conectar con el servidor.",
+        "No fue posible crear la cuenta en este momento.",
       );
     } finally {
       setLoading(false);
     }
   }
 
-  function handleGoogleRegister() {
-    const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL ??
-      "http://localhost:4000";
+  async function handleGoogleCredential(
+    credential: string,
+  ) {
+    setError("");
+    setGoogleLoading(true);
 
-    window.location.href =
-      `${apiUrl}/api/auth/google`;
+    try {
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ??
+        "http://localhost:4000";
+
+      const response = await fetch(
+        `${apiUrl}/api/auth/google`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            credential,
+            acceptedTerms,
+            acceptedPrivacy,
+            acceptedDataPolicy,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        let errorData: ErrorResponse = {};
+
+        try {
+          errorData = await response.json();
+        } catch {
+          // El backend puede responder sin JSON.
+        }
+
+        if (response.status === 400) {
+          if (
+            !acceptedTerms ||
+            !acceptedPrivacy ||
+            !acceptedDataPolicy
+          ) {
+            setError(
+              "Si es tu primera vez en AURUM, acepta los términos, la política de privacidad y la política de tratamiento de datos antes de continuar con Google.",
+            );
+            return;
+          }
+
+          setError(
+            errorData.message ??
+              errorData.error ??
+              "Google no pudo validar los datos de registro.",
+          );
+          return;
+        }
+
+        if (response.status === 403) {
+          setError(
+            errorData.message ??
+              errorData.error ??
+              "Tu cuenta no tiene permitido acceder con Google.",
+          );
+          return;
+        }
+
+        if (response.status === 409) {
+          setError(
+            errorData.message ??
+              errorData.error ??
+              "Este correo ya está vinculado a otra cuenta de Google.",
+          );
+          return;
+        }
+
+        if (response.status === 429) {
+          setError(
+            "Has realizado demasiados intentos. Espera unos minutos e inténtalo nuevamente.",
+          );
+          return;
+        }
+
+        setError(
+          errorData.message ??
+            errorData.error ??
+            "No fue posible continuar con Google.",
+        );
+        return;
+      }
+
+      const data: RegisterResponse =
+        await response.json();
+
+      saveSession(data);
+    } catch {
+      setError(
+        "No fue posible conectar con Google en este momento.",
+      );
+    } finally {
+      setGoogleLoading(false);
+    }
   }
 
-  const inputClass =
-    "w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:cursor-not-allowed disabled:opacity-60";
+  const disabled = loading || googleLoading;
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-purple-950 via-purple-900 to-slate-950 px-4 py-4">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-purple-950 via-purple-900 to-slate-950 px-4 py-6">
       {/* Fondo */}
       <div className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-purple-500/30 blur-3xl" />
       <div className="pointer-events-none absolute -right-20 bottom-0 h-80 w-80 rounded-full bg-amber-300/20 blur-3xl" />
       <div className="pointer-events-none absolute inset-0 bg-black/15 backdrop-blur-sm" />
 
-      {/* Ventana flotante */}
-      <section className="relative z-10 flex max-h-[94vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[1.75rem] border border-white/60 bg-white shadow-2xl shadow-black/30">
-        {/* Encabezado */}
-        <header className="relative shrink-0 overflow-hidden bg-gradient-to-r from-purple-950 via-purple-800 to-indigo-950 px-6 py-5 text-white sm:px-7">
+      <section className="relative z-10 w-full max-w-[760px] overflow-hidden rounded-[1.75rem] border border-white/60 bg-white shadow-2xl shadow-black/30">
+        {/* Cabecera */}
+        <header className="relative overflow-hidden bg-gradient-to-r from-purple-950 via-purple-800 to-indigo-950 px-6 py-5 text-white sm:px-8">
           <div className="absolute -right-10 -top-12 h-32 w-32 rounded-full bg-purple-500/30 blur-3xl" />
 
           <Link
@@ -211,29 +310,38 @@ export default function RegisterPage() {
             </h1>
 
             <p className="mt-1.5 text-xs leading-5 text-purple-100 sm:text-sm">
-              Regístrate para realizar compras y gestionar tus
-              entregas.
+              Regístrate para guardar tus pedidos y
+              personalizaciones.
             </p>
           </div>
         </header>
 
-        {/* Área con scroll interno */}
-        <div className="overflow-y-auto px-6 py-5 sm:px-7">
+        <div className="px-6 py-5 sm:px-8">
           {/* Google */}
-          <button
-            type="button"
-            onClick={handleGoogleRegister}
-            className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:border-purple-200 hover:bg-purple-50"
-          >
-            <GoogleIcon />
-            Registrarse con Google
-          </button>
+          <GoogleAuthButton
+            mode="register"
+            disabled={disabled}
+            onCredential={handleGoogleCredential}
+            onError={setError}
+          />
+
+          <p className="mt-2 text-center text-xs leading-5 text-slate-500">
+            Si es tu primera vez en AURUM, acepta las
+            políticas de registro que aparecen abajo antes
+            de continuar con Google.
+          </p>
+
+          {googleLoading && (
+            <p className="mt-2 text-center text-xs font-medium text-slate-500">
+              Continuando con Google...
+            </p>
+          )}
 
           <div className="my-4 flex items-center gap-3">
             <div className="h-px flex-1 bg-slate-200" />
 
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              O completa tus datos
+              O crea tu cuenta con correo
             </span>
 
             <div className="h-px flex-1 bg-slate-200" />
@@ -243,295 +351,150 @@ export default function RegisterPage() {
             className="space-y-4"
             onSubmit={handleSubmit}
           >
-            {/* Nombre y apellido */}
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
+              {/* Nombre */}
               <div>
                 <label
                   htmlFor="nombre"
                   className="mb-1.5 block text-sm font-bold text-slate-700"
                 >
-                  Nombre *
+                  Nombre
                 </label>
 
                 <div className="relative">
-                  <User className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-purple-500" />
+                  <User className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
 
                   <input
                     id="nombre"
                     type="text"
-                    placeholder="Tu nombre"
                     value={nombre}
                     onChange={(event) =>
                       setNombre(event.target.value)
                     }
                     required
-                    disabled={loading}
-                    className={inputClass}
+                    disabled={disabled}
+                    placeholder="Tu nombre"
+                    className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
                   />
                 </div>
               </div>
 
+              {/* Apellido */}
               <div>
                 <label
                   htmlFor="apellido"
                   className="mb-1.5 block text-sm font-bold text-slate-700"
                 >
-                  Apellido *
+                  Apellido
                 </label>
 
                 <div className="relative">
-                  <User className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-purple-500" />
+                  <User className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
 
                   <input
                     id="apellido"
                     type="text"
-                    placeholder="Tu apellido"
                     value={apellido}
                     onChange={(event) =>
                       setApellido(event.target.value)
                     }
                     required
-                    disabled={loading}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Cédula y teléfono */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label
-                  htmlFor="cedula"
-                  className="mb-1.5 block text-sm font-bold text-slate-700"
-                >
-                  Cédula *
-                </label>
-
-                <div className="relative">
-                  <User className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-purple-500" />
-
-                  <input
-                    id="cedula"
-                    type="text"
-                    placeholder="Número de cédula"
-                    value={cedula}
-                    onChange={(event) =>
-                      setCedula(event.target.value)
-                    }
-                    required
-                    disabled={loading}
-                    className={inputClass}
+                    disabled={disabled}
+                    placeholder="Tu apellido"
+                    className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
                   />
                 </div>
               </div>
 
-              <div>
-                <label
-                  htmlFor="telefono"
-                  className="mb-1.5 block text-sm font-bold text-slate-700"
-                >
-                  Teléfono *
-                </label>
-
-                <div className="relative">
-                  <Phone className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-purple-500" />
-
-                  <input
-                    id="telefono"
-                    type="tel"
-                    placeholder="3001234567"
-                    value={telefono}
-                    onChange={(event) =>
-                      setTelefono(event.target.value)
-                    }
-                    required
-                    disabled={loading}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Dirección */}
-            <div>
-              <label
-                htmlFor="direccion"
-                className="mb-1.5 block text-sm font-bold text-slate-700"
-              >
-                Dirección de entrega *
-              </label>
-
-              <div className="relative">
-                <MapPin className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-purple-500" />
-
-                <input
-                  id="direccion"
-                  type="text"
-                  placeholder="Ej: Carrera 15 #85-30"
-                  value={direccion}
-                  onChange={(event) =>
-                    setDireccion(event.target.value)
-                  }
-                  required
-                  disabled={loading}
-                  className={inputClass}
-                />
-              </div>
-            </div>
-
-            {/* Barrio, ciudad, departamento */}
-            <div className="grid gap-4 md:grid-cols-3">
-              <div>
-                <label
-                  htmlFor="barrio"
-                  className="mb-1.5 block text-sm font-bold text-slate-700"
-                >
-                  Barrio *
-                </label>
-
-                <div className="relative">
-                  <Home className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-purple-500" />
-
-                  <input
-                    id="barrio"
-                    type="text"
-                    placeholder="Barrio"
-                    value={barrio}
-                    onChange={(event) =>
-                      setBarrio(event.target.value)
-                    }
-                    required
-                    disabled={loading}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="ciudad"
-                  className="mb-1.5 block text-sm font-bold text-slate-700"
-                >
-                  Ciudad *
-                </label>
-
-                <div className="relative">
-                  <MapPin className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-purple-500" />
-
-                  <input
-                    id="ciudad"
-                    type="text"
-                    placeholder="Ciudad"
-                    value={ciudad}
-                    onChange={(event) =>
-                      setCiudad(event.target.value)
-                    }
-                    required
-                    disabled={loading}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="departamento"
-                  className="mb-1.5 block text-sm font-bold text-slate-700"
-                >
-                  Departamento *
-                </label>
-
-                <div className="relative">
-                  <MapPin className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-purple-500" />
-
-                  <input
-                    id="departamento"
-                    type="text"
-                    placeholder="Departamento"
-                    value={departamento}
-                    onChange={(event) =>
-                      setDepartamento(
-                        event.target.value,
-                      )
-                    }
-                    required
-                    disabled={loading}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Fecha y correo */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label
-                  htmlFor="fechaNacimiento"
-                  className="mb-1.5 block text-sm font-bold text-slate-700"
-                >
-                  Fecha de nacimiento *
-                </label>
-
-                <div className="relative">
-                  <CalendarDays className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-purple-500" />
-
-                  <input
-                    id="fechaNacimiento"
-                    type="date"
-                    value={fechaNacimiento}
-                    onChange={(event) =>
-                      setFechaNacimiento(
-                        event.target.value,
-                      )
-                    }
-                    required
-                    disabled={loading}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-
+              {/* Correo */}
               <div>
                 <label
                   htmlFor="email"
                   className="mb-1.5 block text-sm font-bold text-slate-700"
                 >
-                  Correo electrónico *
+                  Correo electrónico
                 </label>
 
                 <div className="relative">
-                  <Mail className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-purple-500" />
+                  <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
 
                   <input
                     id="email"
                     type="email"
                     autoComplete="email"
-                    placeholder="correo@ejemplo.com"
                     value={email}
                     onChange={(event) =>
                       setEmail(event.target.value)
                     }
                     required
-                    disabled={loading}
-                    className={inputClass}
+                    disabled={disabled}
+                    placeholder="ejemplo@correo.com"
+                    className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
                   />
                 </div>
               </div>
-            </div>
 
-            {/* Contraseñas */}
-            <div className="grid gap-4 md:grid-cols-2">
+              {/* Teléfono */}
+              <div>
+                <label
+                  htmlFor="telefono"
+                  className="mb-1.5 block text-sm font-bold text-slate-700"
+                >
+                  Teléfono
+                </label>
+
+                <div className="relative">
+                  <Phone className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
+
+                  <input
+                    id="telefono"
+                    type="tel"
+                    value={telefono}
+                    onChange={(event) =>
+                      setTelefono(event.target.value)
+                    }
+                    required
+                    disabled={disabled}
+                    placeholder="3001234567"
+                    className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
+                  />
+                </div>
+              </div>
+
+              {/* Documento */}
+              <div className="sm:col-span-2">
+                <label
+                  htmlFor="documento"
+                  className="mb-1.5 block text-sm font-bold text-slate-700"
+                >
+                  Documento
+                </label>
+
+                <input
+                  id="documento"
+                  type="text"
+                  value={documento}
+                  onChange={(event) =>
+                    setDocumento(event.target.value)
+                  }
+                  required
+                  disabled={disabled}
+                  placeholder="Número de documento"
+                  className="w-full rounded-xl border border-purple-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
+                />
+              </div>
+
+              {/* Contraseña */}
               <div>
                 <label
                   htmlFor="password"
                   className="mb-1.5 block text-sm font-bold text-slate-700"
                 >
-                  Contraseña *
+                  Contraseña
                 </label>
 
                 <div className="relative">
-                  <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-purple-500" />
+                  <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
 
                   <input
                     id="password"
@@ -541,14 +504,14 @@ export default function RegisterPage() {
                         : "password"
                     }
                     autoComplete="new-password"
-                    placeholder="••••••••"
                     value={password}
                     onChange={(event) =>
                       setPassword(event.target.value)
                     }
                     required
-                    disabled={loading}
-                    className={`${inputClass} pr-11`}
+                    disabled={disabled}
+                    placeholder="••••••••"
+                    className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-11 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
                   />
 
                   <button
@@ -558,12 +521,13 @@ export default function RegisterPage() {
                         (value) => !value,
                       )
                     }
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-purple-700"
+                    disabled={disabled}
                     aria-label={
                       showPassword
                         ? "Ocultar contraseña"
                         : "Mostrar contraseña"
                     }
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-purple-700 disabled:opacity-60"
                   >
                     {showPassword ? (
                       <EyeOff className="h-5 w-5" />
@@ -574,16 +538,17 @@ export default function RegisterPage() {
                 </div>
               </div>
 
+              {/* Confirmar contraseña */}
               <div>
                 <label
                   htmlFor="confirmPassword"
                   className="mb-1.5 block text-sm font-bold text-slate-700"
                 >
-                  Confirmar contraseña *
+                  Confirmar contraseña
                 </label>
 
                 <div className="relative">
-                  <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-purple-500" />
+                  <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
 
                   <input
                     id="confirmPassword"
@@ -593,7 +558,6 @@ export default function RegisterPage() {
                         : "password"
                     }
                     autoComplete="new-password"
-                    placeholder="••••••••"
                     value={confirmPassword}
                     onChange={(event) =>
                       setConfirmPassword(
@@ -601,8 +565,9 @@ export default function RegisterPage() {
                       )
                     }
                     required
-                    disabled={loading}
-                    className={`${inputClass} pr-11`}
+                    disabled={disabled}
+                    placeholder="••••••••"
+                    className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-11 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
                   />
 
                   <button
@@ -612,12 +577,13 @@ export default function RegisterPage() {
                         (value) => !value,
                       )
                     }
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-purple-700"
+                    disabled={disabled}
                     aria-label={
                       showConfirmPassword
                         ? "Ocultar contraseña"
                         : "Mostrar contraseña"
                     }
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-purple-700 disabled:opacity-60"
                   >
                     {showConfirmPassword ? (
                       <EyeOff className="h-5 w-5" />
@@ -629,15 +595,9 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <p className="text-xs leading-5 text-slate-500">
-              La contraseña debe tener mínimo 8 caracteres e
-              incluir mayúscula, minúscula, número y un
-              carácter especial.
-            </p>
-
-            {/* Políticas */}
+            {/* Consentimientos */}
             <div className="space-y-2 rounded-xl border border-purple-100 bg-purple-50/60 p-4">
-              <label className="flex items-start gap-3 text-sm text-slate-700">
+              <label className="flex items-start gap-3 text-xs leading-5 text-slate-600">
                 <input
                   type="checkbox"
                   checked={acceptedTerms}
@@ -646,16 +606,17 @@ export default function RegisterPage() {
                       event.target.checked,
                     )
                   }
-                  required
+                  disabled={disabled}
                   className="mt-1 h-4 w-4 accent-purple-700"
                 />
 
                 <span>
-                  Acepto los términos y condiciones.
+                  Acepto los términos y condiciones de
+                  AURUM.
                 </span>
               </label>
 
-              <label className="flex items-start gap-3 text-sm text-slate-700">
+              <label className="flex items-start gap-3 text-xs leading-5 text-slate-600">
                 <input
                   type="checkbox"
                   checked={acceptedPrivacy}
@@ -664,7 +625,7 @@ export default function RegisterPage() {
                       event.target.checked,
                     )
                   }
-                  required
+                  disabled={disabled}
                   className="mt-1 h-4 w-4 accent-purple-700"
                 />
 
@@ -673,7 +634,7 @@ export default function RegisterPage() {
                 </span>
               </label>
 
-              <label className="flex items-start gap-3 text-sm text-slate-700">
+              <label className="flex items-start gap-3 text-xs leading-5 text-slate-600">
                 <input
                   type="checkbox"
                   checked={acceptedDataPolicy}
@@ -682,12 +643,13 @@ export default function RegisterPage() {
                       event.target.checked,
                     )
                   }
-                  required
+                  disabled={disabled}
                   className="mt-1 h-4 w-4 accent-purple-700"
                 />
 
                 <span>
-                  Acepto la política de tratamiento de datos.
+                  Autorizo el tratamiento de mis datos
+                  personales.
                 </span>
               </label>
             </div>
@@ -698,10 +660,9 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {/* Crear cuenta */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={disabled}
               className="w-full rounded-xl bg-gradient-to-r from-purple-800 via-purple-700 to-purple-800 px-6 py-3 text-sm font-black text-amber-300 shadow-lg shadow-purple-200 transition duration-300 hover:-translate-y-0.5 hover:from-purple-900 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading
@@ -710,7 +671,6 @@ export default function RegisterPage() {
             </button>
           </form>
 
-          {/* Login */}
           <div className="mt-4 rounded-xl bg-purple-50 px-5 py-2.5 text-center">
             <p className="text-xs text-slate-600">
               ¿Ya tienes una cuenta?
@@ -724,7 +684,6 @@ export default function RegisterPage() {
             </Link>
           </div>
 
-          {/* Volver */}
           <Link
             href="/"
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-white px-5 py-2.5 text-sm font-bold text-purple-800 transition hover:bg-purple-50"
