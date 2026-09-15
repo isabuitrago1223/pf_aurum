@@ -277,6 +277,16 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Recuperar contraseña */}
+            <div className="flex justify-end">
+              <Link
+                href="/recuperar-contrasena"
+                className="text-sm font-bold text-purple-700 transition hover:text-purple-900 hover:underline"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
+
             {error && (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700">
                 {error}
