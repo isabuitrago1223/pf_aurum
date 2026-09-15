@@ -209,7 +209,15 @@ orderRouter.get(
  *     tags:
  *       - Pedidos
  *     summary: Crear un pedido
- *     description: Crea un pedido para el cliente autenticado, valida stock y descuenta las unidades solicitadas.
+ *     description: >
+ *       Crea un pedido para el cliente autenticado, valida stock, descuenta las
+ *       unidades solicitadas y calcula el costo de envio en el backend.
+ *       Para TIENDA el costo de envio es 0. Para DOMICILIO se requiere direccion,
+ *       barrio, ciudad y departamento completos. Las tarifas en Antioquia son:
+ *       Niquia (Bello) 5000 COP; otros barrios de Bello 7000 COP; Medellin
+ *       10000 COP; Copacabana, Itagui, Envigado y Sabaneta 12000 COP; y otros
+ *       municipios de Antioquia 15000 COP. Los domicilios fuera de Antioquia
+ *       requieren confirmacion del costo y no se crean automaticamente.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -231,6 +239,7 @@ orderRouter.get(
  *                   - DOMICILIO
  *                   - TIENDA
  *                 example: DOMICILIO
+ *                 description: Metodo de entrega. DOMICILIO genera un costo de envio calculado por el backend; TIENDA tiene costo de envio 0.
  *               nombreContacto:
  *                 type: string
  *                 minLength: 2
@@ -254,18 +263,22 @@ orderRouter.get(
  *                 type: string
  *                 maxLength: 160
  *                 example: Calle 10 # 20-30
+ *                 description: Requerida cuando metodoEntrega es DOMICILIO.
  *               barrioEntrega:
  *                 type: string
  *                 maxLength: 80
  *                 example: Niquia
+ *                 description: Requerido cuando metodoEntrega es DOMICILIO y utilizado para calcular la tarifa.
  *               ciudadEntrega:
  *                 type: string
  *                 maxLength: 80
  *                 example: Bello
+ *                 description: Requerida cuando metodoEntrega es DOMICILIO y utilizada para calcular la tarifa.
  *               departamentoEntrega:
  *                 type: string
  *                 maxLength: 80
  *                 example: Antioquia
+ *                 description: Requerido cuando metodoEntrega es DOMICILIO. Los envios fuera de Antioquia requieren confirmacion del costo.
  *               notasEntrega:
  *                 type: string
  *                 maxLength: 500
@@ -291,13 +304,13 @@ orderRouter.get(
  *                       description: Datos opcionales de personalizacion del producto.
  *     responses:
  *       201:
- *         description: Pedido creado correctamente.
+ *         description: Pedido creado correctamente con subtotal, costo de envio, descuento y total calculados por el backend.
  *       400:
- *         description: Datos invalidos o direccion incompleta para entrega a domicilio.
+ *         description: Datos invalidos, direccion o ubicacion incompleta para DOMICILIO, o costo de domicilio fuera de Antioquia pendiente de confirmacion.
  *       401:
  *         description: Autenticacion requerida o sesion invalida.
  *       403:
- *         description: El usuario no tiene rol CLIENTE.
+ *         description: El usuario no tiene rol CLIENTE o la cuenta esta suspendida.
  *       404:
  *         description: Uno o mas productos no existen o no estan disponibles.
  *       409:
