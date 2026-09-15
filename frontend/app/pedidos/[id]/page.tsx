@@ -6,9 +6,15 @@ import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   CalendarDays,
+  Download,
+  House,
+  MapPin,
   Package,
   ReceiptText,
   ShoppingBag,
+  Store,
+  Truck,
+  UserRound,
 } from "lucide-react";
 
 type OrderItem = {
@@ -18,17 +24,45 @@ type OrderItem = {
   imagenProducto: string | null;
   cantidad: number;
   precioUnitario: number;
+  descuentoUnitario: number;
+  personalizacion: unknown | null;
 };
 
 type Order = {
   id: string;
   numeroPedido: string;
   estado: string;
-  subtotal: number;
+
+  metodoEntrega: "DOMICILIO" | "TIENDA";
+
+  nombreContacto: string;
+  cedulaContacto: string | null;
+  emailContacto: string;
+  telefonoContacto: string;
+
+  direccionEntrega: string | null;
+  barrioEntrega: string | null;
+  ciudadEntrega: string | null;
+  departamentoEntrega: string | null;
+  notasEntrega: string | null;
+
+  direccionRecogida: string | null;
+  fechaRecogida: string | null;
+  horaRecogida: string | null;
+
   costoEnvio: number;
+  subtotal: number;
   descuento: number;
   total: number;
+
+  fechaEstimadaEntrega: string | null;
+  enlaceRastreo: string | null;
+  motivoCancelacion: string | null;
+  canceladoAt: string | null;
+
   createdAt: string;
+  updatedAt: string;
+
   items: OrderItem[];
 };
 
@@ -39,6 +73,8 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [downloadingReceipt, setDownloadingReceipt] = useState(false);
+  const [receiptError, setReceiptError] = useState("");
 
   useEffect(() => {
     async function loadOrder() {
@@ -113,14 +149,10 @@ export default function OrderDetailPage() {
       case "PENDIENTE":
         return "border-amber-200 bg-amber-50 text-amber-700";
 
-      case "CONFIRMADO":
-      case "APROBADO":
-        return "border-emerald-200 bg-emerald-50 text-emerald-700";
-
       case "EN_PREPARACION":
         return "border-purple-200 bg-purple-50 text-purple-700";
 
-      case "ENVIADO":
+      case "EN_CAMINO":
         return "border-blue-200 bg-blue-50 text-blue-700";
 
       case "ENTREGADO":
@@ -131,6 +163,94 @@ export default function OrderDetailPage() {
 
       default:
         return "border-gray-200 bg-gray-50 text-gray-700";
+    }
+  }
+
+  function formatPersonalization(value: unknown) {
+    if (value === null || value === undefined) {
+      return "";
+    }
+
+    if (typeof value === "string") {
+      return value;
+    }
+
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return "Personalización registrada";
+    }
+  }
+
+  async function handleDownloadReceipt() {
+    if (!order || downloadingReceipt) {
+      return;
+    }
+
+    const token = localStorage.getItem("aurum_token");
+
+    if (!token) {
+      setReceiptError(
+        "Debes iniciar sesión nuevamente para descargar el comprobante.",
+      );
+      return;
+    }
+
+    setDownloadingReceipt(true);
+    setReceiptError("");
+
+    try {
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+      const response = await fetch(
+        `${apiUrl}/api/orders/${order.id}/receipt`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (response.status === 401 || response.status === 403) {
+        setReceiptError(
+          "Tu sesión no es válida o no tienes permisos para descargar este comprobante.",
+        );
+        return;
+      }
+
+      if (response.status === 404) {
+        setReceiptError(
+          "No fue posible encontrar el comprobante de este pedido.",
+        );
+        return;
+      }
+
+      if (!response.ok) {
+        setReceiptError("No fue posible descargar el comprobante.");
+        return;
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+
+      anchor.href = objectUrl;
+      anchor.download = `comprobante-${order.numeroPedido}.pdf`;
+
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      setReceiptError("No fue posible conectar con el servidor.");
+    } finally {
+      setDownloadingReceipt(false);
     }
   }
 
@@ -158,7 +278,8 @@ export default function OrderDetailPage() {
             </h1>
 
             <p className="mt-4 max-w-2xl text-sm leading-7 text-[#eee5f2] sm:text-base">
-              Consulta los productos, valores y estado actual de tu pedido.
+              Consulta los productos, la entrega, los valores y el estado
+              actual de tu pedido.
             </p>
           </div>
         </div>
@@ -191,6 +312,15 @@ export default function OrderDetailPage() {
               <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#807385]">
                 {error}
               </p>
+
+              {error.includes("iniciar sesión") && (
+                <Link
+                  href="/login"
+                  className="mt-6 inline-flex items-center rounded-xl bg-[#6b2a83] px-5 py-3 text-sm font-black text-white transition hover:bg-[#4b1f63]"
+                >
+                  Iniciar sesión
+                </Link>
+              )}
             </div>
           )}
 
@@ -236,38 +366,277 @@ export default function OrderDetailPage() {
               </section>
 
               <section className="rounded-[2rem] border border-[#e7ddec] bg-white p-6 shadow-sm sm:p-8">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-50 text-[#6b2a83]">
+                    <UserRound size={20} />
+                  </div>
+
+                  <h3 className="font-serif text-2xl font-black text-[#351641]">
+                    Datos de contacto
+                  </h3>
+                </div>
+
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-[#9a8aa0]">
+                      Nombre
+                    </p>
+                    <p className="mt-1 font-bold text-[#351641]">
+                      {order.nombreContacto}
+                    </p>
+                  </div>
+
+                  {order.cedulaContacto && (
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide text-[#9a8aa0]">
+                        Cédula
+                      </p>
+                      <p className="mt-1 font-bold text-[#351641]">
+                        {order.cedulaContacto}
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-[#9a8aa0]">
+                      Correo
+                    </p>
+                    <p className="mt-1 break-words font-bold text-[#351641]">
+                      {order.emailContacto}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-[#9a8aa0]">
+                      Teléfono
+                    </p>
+                    <p className="mt-1 font-bold text-[#351641]">
+                      {order.telefonoContacto}
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-[2rem] border border-[#e7ddec] bg-white p-6 shadow-sm sm:p-8">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-50 text-[#6b2a83]">
+                    {order.metodoEntrega === "DOMICILIO" ? (
+                      <Truck size={20} />
+                    ) : (
+                      <Store size={20} />
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-[#9a8aa0]">
+                      Método de entrega
+                    </p>
+
+                    <h3 className="font-serif text-2xl font-black text-[#351641]">
+                      {order.metodoEntrega === "DOMICILIO"
+                        ? "Entrega a domicilio"
+                        : "Recogida en tienda"}
+                    </h3>
+                  </div>
+                </div>
+
+                {order.metodoEntrega === "DOMICILIO" ? (
+                  <div className="mt-5 space-y-4">
+                    {order.direccionEntrega && (
+                      <div className="flex gap-3">
+                        <MapPin
+                          size={18}
+                          className="mt-0.5 shrink-0 text-[#6b2a83]"
+                        />
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wide text-[#9a8aa0]">
+                            Dirección
+                          </p>
+                          <p className="mt-1 font-bold text-[#351641]">
+                            {order.direccionEntrega}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      {order.barrioEntrega && (
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wide text-[#9a8aa0]">
+                            Barrio
+                          </p>
+                          <p className="mt-1 font-bold text-[#351641]">
+                            {order.barrioEntrega}
+                          </p>
+                        </div>
+                      )}
+
+                      {order.ciudadEntrega && (
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wide text-[#9a8aa0]">
+                            Ciudad
+                          </p>
+                          <p className="mt-1 font-bold text-[#351641]">
+                            {order.ciudadEntrega}
+                          </p>
+                        </div>
+                      )}
+
+                      {order.departamentoEntrega && (
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wide text-[#9a8aa0]">
+                            Departamento
+                          </p>
+                          <p className="mt-1 font-bold text-[#351641]">
+                            {order.departamentoEntrega}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {order.notasEntrega && (
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-[#9a8aa0]">
+                          Indicaciones
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[#6d5f72]">
+                          {order.notasEntrega}
+                        </p>
+                      </div>
+                    )}
+
+                    {order.fechaEstimadaEntrega && (
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-[#9a8aa0]">
+                          Fecha estimada de entrega
+                        </p>
+                        <p className="mt-1 font-bold text-[#351641]">
+                          {formatDate(order.fechaEstimadaEntrega)}
+                        </p>
+                      </div>
+                    )}
+
+                    {order.enlaceRastreo && (
+                      <a
+                        href={order.enlaceRastreo}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 text-sm font-black text-[#6b2a83] transition hover:text-[#351641]"
+                      >
+                        <House size={16} />
+                        Consultar seguimiento
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                    {order.direccionRecogida && (
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-[#9a8aa0]">
+                          Punto de recogida
+                        </p>
+                        <p className="mt-1 font-bold text-[#351641]">
+                          {order.direccionRecogida}
+                        </p>
+                      </div>
+                    )}
+
+                    {order.fechaRecogida && (
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-[#9a8aa0]">
+                          Fecha
+                        </p>
+                        <p className="mt-1 font-bold text-[#351641]">
+                          {formatDate(order.fechaRecogida)}
+                        </p>
+                      </div>
+                    )}
+
+                    {order.horaRecogida && (
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-[#9a8aa0]">
+                          Hora
+                        </p>
+                        <p className="mt-1 font-bold text-[#351641]">
+                          {order.horaRecogida}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {order.estado === "CANCELADO" &&
+                  order.motivoCancelacion && (
+                    <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4">
+                      <p className="text-xs font-black uppercase tracking-wide text-red-700">
+                        Motivo de cancelación
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-red-700">
+                        {order.motivoCancelacion}
+                      </p>
+                    </div>
+                  )}
+              </section>
+
+              <section className="rounded-[2rem] border border-[#e7ddec] bg-white p-6 shadow-sm sm:p-8">
                 <h3 className="font-serif text-2xl font-black text-[#351641]">
                   Productos
                 </h3>
 
                 <div className="mt-5 space-y-4">
-                  {order.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex flex-col justify-between gap-4 rounded-2xl border border-[#eee5f2] bg-[#fdfbfe] p-5 sm:flex-row sm:items-center"
-                    >
-                      <div>
-                        <p className="font-black text-[#351641]">
-                          {item.nombreProducto}
-                        </p>
+                  {order.items.map((item) => {
+                    const personalization = formatPersonalization(
+                      item.personalizacion,
+                    );
 
-                        <p className="mt-2 text-sm text-[#807385]">
-                          Cantidad: {item.cantidad}
-                        </p>
+                    const itemTotal =
+                      (item.precioUnitario - item.descuentoUnitario) *
+                      item.cantidad;
 
-                        <p className="mt-1 text-sm text-[#807385]">
-                          Precio unitario:{" "}
-                          {formatPrice(item.precioUnitario)}
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex flex-col justify-between gap-4 rounded-2xl border border-[#eee5f2] bg-[#fdfbfe] p-5 sm:flex-row sm:items-start"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-black text-[#351641]">
+                            {item.nombreProducto}
+                          </p>
+
+                          <p className="mt-2 text-sm text-[#807385]">
+                            Cantidad: {item.cantidad}
+                          </p>
+
+                          <p className="mt-1 text-sm text-[#807385]">
+                            Precio unitario:{" "}
+                            {formatPrice(item.precioUnitario)}
+                          </p>
+
+                          {item.descuentoUnitario > 0 && (
+                            <p className="mt-1 text-sm text-[#807385]">
+                              Descuento unitario:{" "}
+                              {formatPrice(item.descuentoUnitario)}
+                            </p>
+                          )}
+
+                          {personalization && (
+                            <div className="mt-3 rounded-xl border border-purple-100 bg-purple-50/60 p-3">
+                              <p className="text-xs font-black uppercase tracking-wide text-[#6b2a83]">
+                                Personalización
+                              </p>
+                              <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-[#6d5f72]">
+                                {personalization}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        <p className="shrink-0 text-lg font-black text-[#351641]">
+                          {formatPrice(itemTotal)}
                         </p>
                       </div>
-
-                      <p className="text-lg font-black text-[#351641]">
-                        {formatPrice(
-                          item.precioUnitario * item.cantidad,
-                        )}
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
 
@@ -310,10 +679,36 @@ export default function OrderDetailPage() {
                 </div>
               </section>
 
-              <section className="rounded-[2rem] border border-[#eadff0] bg-[#f8f1fb] p-6 text-sm leading-6 text-[#6d5f72]">
-                La opción de pago se conectará después con la integración de
-                Wompi. Por ahora esta pantalla muestra únicamente la información
-                del pedido para no interferir con la integración de pagos.
+              <section className="rounded-[2rem] border border-[#e7ddec] bg-white p-6 shadow-sm sm:p-8">
+                <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+                  <div>
+                    <h3 className="font-serif text-xl font-black text-[#351641]">
+                      Comprobante del pedido
+                    </h3>
+
+                    <p className="mt-1 text-sm leading-6 text-[#807385]">
+                      Descarga el comprobante PDF correspondiente a este pedido.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadReceipt}
+                    disabled={downloadingReceipt}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#6b2a83] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#4b1f63] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Download size={17} />
+                    {downloadingReceipt
+                      ? "Descargando..."
+                      : "Descargar comprobante"}
+                  </button>
+                </div>
+
+                {receiptError && (
+                  <p className="mt-4 rounded-xl border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-700">
+                    {receiptError}
+                  </p>
+                )}
               </section>
             </div>
           )}
