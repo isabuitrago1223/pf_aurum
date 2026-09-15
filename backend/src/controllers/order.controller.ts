@@ -7,6 +7,63 @@ import { sendOrderConfirmationEmail } from '../services/mail.service.js';
 import { createOrderReceiptPdf } from '../services/order-receipt.service.js';
 import { AppError } from '../utils/app-error.js';
 
+function normalizeDeliveryLocation(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function calculateDeliveryCost(
+  metodoEntrega: 'DOMICILIO' | 'TIENDA',
+  departamento?: string,
+  ciudad?: string,
+  barrio?: string
+) {
+  if (metodoEntrega === 'TIENDA') {
+    return 0;
+  }
+
+  if (!departamento || !ciudad || !barrio) {
+    throw new AppError(
+      400,
+      'La ubicacion completa es requerida para calcular el domicilio.'
+    );
+  }
+
+  const department = normalizeDeliveryLocation(departamento);
+  const city = normalizeDeliveryLocation(ciudad);
+  const neighborhood = normalizeDeliveryLocation(barrio);
+
+  if (department !== 'antioquia') {
+    throw new AppError(
+      400,
+      'El costo de domicilio fuera de Antioquia debe ser confirmado.'
+    );
+  }
+
+  if (city === 'bello' && neighborhood === 'niquia') {
+    return 5000;
+  }
+
+  if (city === 'bello') {
+    return 7000;
+  }
+
+  if (city === 'medellin') {
+    return 10000;
+  }
+
+  if (
+    ['copacabana', 'itagui', 'envigado', 'sabaneta'].includes(city)
+  ) {
+    return 12000;
+  }
+
+  return 15000;
+}
+
 const createOrderSchema = z.object({
   metodoEntrega: z.enum(['DOMICILIO', 'TIENDA']),
   nombreContacto: z.string().trim().min(2).max(160),
@@ -111,7 +168,12 @@ export async function createOrder(
     };
   });
 
-  const costoEnvio = 0;
+  const costoEnvio = calculateDeliveryCost(
+    data.metodoEntrega,
+    data.departamentoEntrega,
+    data.ciudadEntrega,
+    data.barrioEntrega
+  );
   const descuento = 0;
   const total = subtotal + costoEnvio - descuento;
 
