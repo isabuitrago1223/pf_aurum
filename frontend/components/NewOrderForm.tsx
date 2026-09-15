@@ -40,11 +40,17 @@ type PaymentMethod =
   | "PSE"
   | "TRANSFERENCIA_BANCARIA";
 
+type MoneyValue = number | string;
+
 type CreateOrderResponse = {
   message: string;
   order: {
     id: string;
     numeroPedido: string;
+    subtotal: MoneyValue;
+    costoEnvio: MoneyValue;
+    descuento: MoneyValue;
+    total: MoneyValue;
   };
 };
 
@@ -151,10 +157,10 @@ function calculateDeliveryEstimate(
   const neighborhood = normalize(barrio);
 
   /*
-   * Tarifas PROVISIONALES para frontend.
-   * El punto de salida es Niquía, Bello.
-   * Ajusta estos valores cuando Aurum defina
-   * las tarifas reales de domicilio.
+   * Tarifas de domicilio definidas por Aurum.
+   * El frontend las muestra como referencia antes
+   * de crear el pedido; el backend confirma y
+   * calcula el valor definitivo.
    */
   if (
     department === "antioquia" &&
@@ -202,7 +208,7 @@ function calculateDeliveryEstimate(
   if (department === "antioquia") {
     return {
       amount: 15000,
-      label: "Tarifa estimada Antioquia",
+      label: "Tarifa Antioquia",
     };
   }
 
@@ -251,6 +257,10 @@ export default function NewOrderForm() {
   const [createdOrder, setCreatedOrder] = useState<{
     id: string;
     numeroPedido: string;
+    subtotal: number;
+    costoEnvio: number;
+    descuento: number;
+    total: number;
   } | null>(null);
 
   const [wompiAcceptance, setWompiAcceptance] =
@@ -800,8 +810,15 @@ export default function NewOrderForm() {
       }
 
       if (!response.ok) {
+        const data = (await response
+          .json()
+          .catch(() => null)) as
+          | ApiErrorResponse
+          | null;
+
         setError(
-          "No fue posible crear el pedido. Revisa los datos e intenta nuevamente.",
+          data?.message ??
+            "No fue posible crear el pedido. Revisa los datos e intenta nuevamente.",
         );
         return;
       }
@@ -813,6 +830,10 @@ export default function NewOrderForm() {
         id: data.order.id,
         numeroPedido:
           data.order.numeroPedido,
+        subtotal: Number(data.order.subtotal),
+        costoEnvio: Number(data.order.costoEnvio),
+        descuento: Number(data.order.descuento),
+        total: Number(data.order.total),
       });
 
       setError("");
@@ -2013,17 +2034,17 @@ export default function NewOrderForm() {
                       </p>
                     </div>
 
-                    {/* COSTO ESTIMADO DEL DOMICILIO */}
+                    {/* TARIFA DE DOMICILIO */}
                     <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="text-sm font-black text-purple-950">
-                            Domicilio estimado desde Niquía, Bello
+                            Tarifa de domicilio desde Niquía, Bello
                           </p>
 
                           <p className="mt-1 text-xs text-slate-600">
-                            {deliveryEstimate.label}. El valor final puede
-                            ajustarse al confirmar la dirección.
+                            {deliveryEstimate.label}. El backend confirmará
+                            el valor definitivo al crear el pedido.
                           </p>
                         </div>
 
@@ -2154,12 +2175,22 @@ export default function NewOrderForm() {
 
                 {createdOrder && (
                   <div className="mt-5 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900">
-                    <strong>
-                      Pedido preparado:
-                    </strong>{" "}
-                    {
-                      createdOrder.numeroPedido
-                    }
+                    <p>
+                      <strong>Pedido preparado:</strong>{" "}
+                      {createdOrder.numeroPedido}
+                    </p>
+
+                    <div className="mt-3 grid gap-2 border-t border-purple-200 pt-3 sm:grid-cols-2">
+                      <p>
+                        <span className="font-bold">Domicilio confirmado:</span>{" "}
+                        {formatPrice(createdOrder.costoEnvio)}
+                      </p>
+
+                      <p className="sm:text-right">
+                        <span className="font-bold">Total confirmado:</span>{" "}
+                        {formatPrice(createdOrder.total)}
+                      </p>
+                    </div>
                   </div>
                 )}
 
