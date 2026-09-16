@@ -1,9 +1,17 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 
-import { login, register } from '../controllers/auth.controller.js';
+import {
+  forgotPassword,
+  login,
+  register,
+  resetPassword
+} from '../controllers/auth.controller.js';
 import { asyncHandler } from '../middlewares/async-handler.middleware.js';
-import { requireAuth, requireRole } from '../middlewares/auth.middleware.js';
+import {
+  requireAuth,
+  requireRole
+} from '../middlewares/auth.middleware.js';
 
 export const authRouter = Router();
 
@@ -13,7 +21,19 @@ const loginRateLimit = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: {
-    message: 'Demasiados intentos de inicio de sesion. Intenta nuevamente mas tarde.'
+    message:
+      'Demasiados intentos de inicio de sesion. Intenta nuevamente mas tarde.'
+  }
+});
+
+const passwordRecoveryRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: {
+    message:
+      'Demasiados intentos de recuperacion. Intenta nuevamente mas tarde.'
   }
 });
 
@@ -26,6 +46,18 @@ authRouter.post(
   '/login',
   loginRateLimit,
   asyncHandler(login)
+);
+
+authRouter.post(
+  '/forgot-password',
+  passwordRecoveryRateLimit,
+  asyncHandler(forgotPassword)
+);
+
+authRouter.post(
+  '/reset-password',
+  passwordRecoveryRateLimit,
+  asyncHandler(resetPassword)
 );
 
 authRouter.get('/profile', requireAuth, (req, res) => {
