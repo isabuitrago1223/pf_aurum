@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import {
   ArrowLeft,
+  CalendarDays,
   Eye,
   EyeOff,
+  Home,
   LockKeyhole,
   Mail,
+  MapPin,
   Phone,
   Sparkles,
   User,
@@ -39,31 +42,30 @@ export default function RegisterPage() {
   const [apellido, setApellido] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
-  const [documento, setDocumento] = useState("");
+  const [cedula, setCedula] = useState("");
+  const [fechaNacimiento, setFechaNacimiento] = useState("");
+  const [direccion, setDireccion] = useState("");
+  const [barrio, setBarrio] = useState("");
+  const [ciudad, setCiudad] = useState("");
+  const [departamento, setDepartamento] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] =
-    useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
-  const [showPassword, setShowPassword] =
-    useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
 
-  const [acceptedTerms, setAcceptedTerms] =
-    useState(false);
-  const [acceptedPrivacy, setAcceptedPrivacy] =
-    useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   const [acceptedDataPolicy, setAcceptedDataPolicy] =
     useState(false);
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] =
-    useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   function saveSession(data: RegisterResponse) {
     localStorage.setItem("aurum_token", data.token);
-
     localStorage.setItem(
       "aurum_user",
       JSON.stringify(data.user),
@@ -73,12 +75,82 @@ export default function RegisterPage() {
     router.refresh();
   }
 
+  function validatePassword(value: string) {
+    return (
+      value.length >= 8 &&
+      /[A-Z]/.test(value) &&
+      /[a-z]/.test(value) &&
+      /[0-9]/.test(value) &&
+      /[^A-Za-z0-9]/.test(value)
+    );
+  }
+
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
-
     setError("");
+
+    const cleanNombre = nombre.trim();
+    const cleanApellido = apellido.trim();
+    const cleanEmail = email.trim();
+    const cleanTelefono = telefono.trim();
+    const cleanCedula = cedula.trim();
+    const cleanDireccion = direccion.trim();
+    const cleanBarrio = barrio.trim();
+    const cleanCiudad = ciudad.trim();
+    const cleanDepartamento = departamento.trim();
+
+    if (cleanNombre.length < 2 || cleanApellido.length < 2) {
+      setError(
+        "El nombre y el apellido deben tener al menos 2 caracteres.",
+      );
+      return;
+    }
+
+    if (!/^\d{6,15}$/.test(cleanCedula)) {
+      setError(
+        "La cédula debe contener únicamente entre 6 y 15 números.",
+      );
+      return;
+    }
+
+    if (!/^\+?[0-9\s-]{7,20}$/.test(cleanTelefono)) {
+      setError(
+        "Ingresa un número de teléfono válido.",
+      );
+      return;
+    }
+
+    if (!fechaNacimiento) {
+      setError("Selecciona tu fecha de nacimiento.");
+      return;
+    }
+
+    if (cleanDireccion.length < 5) {
+      setError(
+        "La dirección debe tener al menos 5 caracteres.",
+      );
+      return;
+    }
+
+    if (
+      cleanBarrio.length < 2 ||
+      cleanCiudad.length < 2 ||
+      cleanDepartamento.length < 2
+    ) {
+      setError(
+        "Completa correctamente barrio, ciudad y departamento.",
+      );
+      return;
+    }
+
+    if (!validatePassword(password)) {
+      setError(
+        "La contraseña debe tener mínimo 8 caracteres e incluir mayúscula, minúscula, número y símbolo.",
+      );
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError("Las contraseñas no coinciden.");
@@ -111,11 +183,16 @@ export default function RegisterPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            nombre,
-            apellido,
-            email,
-            telefono,
-            documento,
+            nombre: cleanNombre,
+            apellido: cleanApellido,
+            cedula: cleanCedula,
+            telefono: cleanTelefono,
+            direccion: cleanDireccion,
+            barrio: cleanBarrio,
+            ciudad: cleanCiudad,
+            departamento: cleanDepartamento,
+            fechaNacimiento,
+            email: cleanEmail,
             password,
             acceptedTerms,
             acceptedPrivacy,
@@ -133,11 +210,20 @@ export default function RegisterPage() {
           // El backend puede responder sin JSON.
         }
 
+        if (response.status === 400) {
+          setError(
+            errorData.message ??
+              errorData.error ??
+              "Revisa los datos ingresados e inténtalo nuevamente.",
+          );
+          return;
+        }
+
         if (response.status === 409) {
           setError(
             errorData.message ??
               errorData.error ??
-              "Ya existe una cuenta con estos datos.",
+              "El correo o la cédula ya están registrados.",
           );
           return;
         }
@@ -163,7 +249,7 @@ export default function RegisterPage() {
       saveSession(data);
     } catch {
       setError(
-        "No fue posible crear la cuenta en este momento.",
+        "No fue posible conectar con AURUM. Verifica tu conexión e inténtalo nuevamente.",
       );
     } finally {
       setLoading(false);
@@ -274,15 +360,19 @@ export default function RegisterPage() {
 
   const disabled = loading || googleLoading;
 
+  const inputClass =
+    "w-full rounded-xl border border-purple-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60";
+
+  const iconInputClass =
+    "w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60";
+
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-purple-950 via-purple-900 to-slate-950 px-4 py-6">
-      {/* Fondo */}
+    <main className="relative min-h-screen overflow-hidden bg-gradient-to-br from-purple-950 via-purple-900 to-slate-950 px-4 py-8">
       <div className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-purple-500/30 blur-3xl" />
       <div className="pointer-events-none absolute -right-20 bottom-0 h-80 w-80 rounded-full bg-amber-300/20 blur-3xl" />
       <div className="pointer-events-none absolute inset-0 bg-black/15 backdrop-blur-sm" />
 
-      <section className="relative z-10 w-full max-w-[760px] overflow-hidden rounded-[1.75rem] border border-white/60 bg-white shadow-2xl shadow-black/30">
-        {/* Cabecera */}
+      <section className="relative z-10 mx-auto w-full max-w-[820px] overflow-hidden rounded-[1.75rem] border border-white/60 bg-white shadow-2xl shadow-black/30">
         <header className="relative overflow-hidden bg-gradient-to-r from-purple-950 via-purple-800 to-indigo-950 px-6 py-5 text-white sm:px-8">
           <div className="absolute -right-10 -top-12 h-32 w-32 rounded-full bg-purple-500/30 blur-3xl" />
 
@@ -306,7 +396,7 @@ export default function RegisterPage() {
             </div>
 
             <h1 className="mt-2 font-serif text-3xl font-black tracking-tight sm:text-[2.25rem]">
-              Crear Cuenta
+              Crear cuenta
             </h1>
 
             <p className="mt-1.5 text-xs leading-5 text-purple-100 sm:text-sm">
@@ -316,8 +406,7 @@ export default function RegisterPage() {
           </div>
         </header>
 
-        <div className="px-6 py-5 sm:px-8">
-          {/* Google */}
+        <div className="px-6 py-6 sm:px-8">
           <GoogleAuthButton
             mode="register"
             disabled={disabled}
@@ -327,8 +416,8 @@ export default function RegisterPage() {
 
           <p className="mt-2 text-center text-xs leading-5 text-slate-500">
             Si es tu primera vez en AURUM, acepta las
-            políticas de registro que aparecen abajo antes
-            de continuar con Google.
+            políticas de registro antes de continuar con
+            Google.
           </p>
 
           {googleLoading && (
@@ -337,7 +426,7 @@ export default function RegisterPage() {
             </p>
           )}
 
-          <div className="my-4 flex items-center gap-3">
+          <div className="my-5 flex items-center gap-3">
             <div className="h-px flex-1 bg-slate-200" />
 
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -348,254 +437,438 @@ export default function RegisterPage() {
           </div>
 
           <form
-            className="space-y-4"
+            className="space-y-5"
             onSubmit={handleSubmit}
           >
-            <div className="grid gap-4 sm:grid-cols-2">
-              {/* Nombre */}
-              <div>
-                <label
-                  htmlFor="nombre"
-                  className="mb-1.5 block text-sm font-bold text-slate-700"
-                >
-                  Nombre
-                </label>
+            <div>
+              <h2 className="text-sm font-black text-purple-900">
+                Información personal
+              </h2>
 
-                <div className="relative">
-                  <User className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
-
-                  <input
-                    id="nombre"
-                    type="text"
-                    value={nombre}
-                    onChange={(event) =>
-                      setNombre(event.target.value)
-                    }
-                    required
-                    disabled={disabled}
-                    placeholder="Tu nombre"
-                    className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
-                  />
-                </div>
-              </div>
-
-              {/* Apellido */}
-              <div>
-                <label
-                  htmlFor="apellido"
-                  className="mb-1.5 block text-sm font-bold text-slate-700"
-                >
-                  Apellido
-                </label>
-
-                <div className="relative">
-                  <User className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
-
-                  <input
-                    id="apellido"
-                    type="text"
-                    value={apellido}
-                    onChange={(event) =>
-                      setApellido(event.target.value)
-                    }
-                    required
-                    disabled={disabled}
-                    placeholder="Tu apellido"
-                    className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
-                  />
-                </div>
-              </div>
-
-              {/* Correo */}
-              <div>
-                <label
-                  htmlFor="email"
-                  className="mb-1.5 block text-sm font-bold text-slate-700"
-                >
-                  Correo electrónico
-                </label>
-
-                <div className="relative">
-                  <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
-
-                  <input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(event) =>
-                      setEmail(event.target.value)
-                    }
-                    required
-                    disabled={disabled}
-                    placeholder="ejemplo@correo.com"
-                    className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
-                  />
-                </div>
-              </div>
-
-              {/* Teléfono */}
-              <div>
-                <label
-                  htmlFor="telefono"
-                  className="mb-1.5 block text-sm font-bold text-slate-700"
-                >
-                  Teléfono
-                </label>
-
-                <div className="relative">
-                  <Phone className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
-
-                  <input
-                    id="telefono"
-                    type="tel"
-                    value={telefono}
-                    onChange={(event) =>
-                      setTelefono(event.target.value)
-                    }
-                    required
-                    disabled={disabled}
-                    placeholder="3001234567"
-                    className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
-                  />
-                </div>
-              </div>
-
-              {/* Documento */}
-              <div className="sm:col-span-2">
-                <label
-                  htmlFor="documento"
-                  className="mb-1.5 block text-sm font-bold text-slate-700"
-                >
-                  Documento
-                </label>
-
-                <input
-                  id="documento"
-                  type="text"
-                  value={documento}
-                  onChange={(event) =>
-                    setDocumento(event.target.value)
-                  }
-                  required
-                  disabled={disabled}
-                  placeholder="Número de documento"
-                  className="w-full rounded-xl border border-purple-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
-                />
-              </div>
-
-              {/* Contraseña */}
-              <div>
-                <label
-                  htmlFor="password"
-                  className="mb-1.5 block text-sm font-bold text-slate-700"
-                >
-                  Contraseña
-                </label>
-
-                <div className="relative">
-                  <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
-
-                  <input
-                    id="password"
-                    type={
-                      showPassword
-                        ? "text"
-                        : "password"
-                    }
-                    autoComplete="new-password"
-                    value={password}
-                    onChange={(event) =>
-                      setPassword(event.target.value)
-                    }
-                    required
-                    disabled={disabled}
-                    placeholder="••••••••"
-                    className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-11 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowPassword(
-                        (value) => !value,
-                      )
-                    }
-                    disabled={disabled}
-                    aria-label={
-                      showPassword
-                        ? "Ocultar contraseña"
-                        : "Mostrar contraseña"
-                    }
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-purple-700 disabled:opacity-60"
+              <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="nombre"
+                    className="mb-1.5 block text-sm font-bold text-slate-700"
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
+                    Nombre
+                  </label>
+
+                  <div className="relative">
+                    <User className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
+
+                    <input
+                      id="nombre"
+                      type="text"
+                      autoComplete="given-name"
+                      value={nombre}
+                      onChange={(event) =>
+                        setNombre(event.target.value)
+                      }
+                      required
+                      minLength={2}
+                      maxLength={80}
+                      disabled={disabled}
+                      placeholder="Tu nombre"
+                      className={iconInputClass}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              {/* Confirmar contraseña */}
-              <div>
-                <label
-                  htmlFor="confirmPassword"
-                  className="mb-1.5 block text-sm font-bold text-slate-700"
-                >
-                  Confirmar contraseña
-                </label>
+                <div>
+                  <label
+                    htmlFor="apellido"
+                    className="mb-1.5 block text-sm font-bold text-slate-700"
+                  >
+                    Apellido
+                  </label>
 
-                <div className="relative">
-                  <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
+                  <div className="relative">
+                    <User className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
+
+                    <input
+                      id="apellido"
+                      type="text"
+                      autoComplete="family-name"
+                      value={apellido}
+                      onChange={(event) =>
+                        setApellido(event.target.value)
+                      }
+                      required
+                      minLength={2}
+                      maxLength={80}
+                      disabled={disabled}
+                      placeholder="Tu apellido"
+                      className={iconInputClass}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="cedula"
+                    className="mb-1.5 block text-sm font-bold text-slate-700"
+                  >
+                    Cédula
+                  </label>
 
                   <input
-                    id="confirmPassword"
-                    type={
-                      showConfirmPassword
-                        ? "text"
-                        : "password"
-                    }
-                    autoComplete="new-password"
-                    value={confirmPassword}
+                    id="cedula"
+                    type="text"
+                    inputMode="numeric"
+                    value={cedula}
                     onChange={(event) =>
-                      setConfirmPassword(
-                        event.target.value,
+                      setCedula(
+                        event.target.value.replace(
+                          /\D/g,
+                          "",
+                        ),
                       )
                     }
                     required
+                    minLength={6}
+                    maxLength={15}
                     disabled={disabled}
-                    placeholder="••••••••"
-                    className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-11 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
+                    placeholder="Número de cédula"
+                    className={inputClass}
                   />
+                </div>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowConfirmPassword(
-                        (value) => !value,
-                      )
-                    }
-                    disabled={disabled}
-                    aria-label={
-                      showConfirmPassword
-                        ? "Ocultar contraseña"
-                        : "Mostrar contraseña"
-                    }
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-purple-700 disabled:opacity-60"
+                <div>
+                  <label
+                    htmlFor="fechaNacimiento"
+                    className="mb-1.5 block text-sm font-bold text-slate-700"
                   >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
+                    Fecha de nacimiento
+                  </label>
+
+                  <div className="relative">
+                    <CalendarDays className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
+
+                    <input
+                      id="fechaNacimiento"
+                      type="date"
+                      value={fechaNacimiento}
+                      onChange={(event) =>
+                        setFechaNacimiento(
+                          event.target.value,
+                        )
+                      }
+                      required
+                      disabled={disabled}
+                      className={iconInputClass}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="email"
+                    className="mb-1.5 block text-sm font-bold text-slate-700"
+                  >
+                    Correo electrónico
+                  </label>
+
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
+
+                    <input
+                      id="email"
+                      type="email"
+                      autoComplete="email"
+                      value={email}
+                      onChange={(event) =>
+                        setEmail(event.target.value)
+                      }
+                      required
+                      maxLength={120}
+                      disabled={disabled}
+                      placeholder="ejemplo@correo.com"
+                      className={iconInputClass}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="telefono"
+                    className="mb-1.5 block text-sm font-bold text-slate-700"
+                  >
+                    Teléfono
+                  </label>
+
+                  <div className="relative">
+                    <Phone className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
+
+                    <input
+                      id="telefono"
+                      type="tel"
+                      autoComplete="tel"
+                      value={telefono}
+                      onChange={(event) =>
+                        setTelefono(event.target.value)
+                      }
+                      required
+                      minLength={7}
+                      maxLength={20}
+                      disabled={disabled}
+                      placeholder="3001234567"
+                      className={iconInputClass}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Consentimientos */}
+            <div className="border-t border-purple-100 pt-5">
+              <h2 className="text-sm font-black text-purple-900">
+                Dirección
+              </h2>
+
+              <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label
+                    htmlFor="direccion"
+                    className="mb-1.5 block text-sm font-bold text-slate-700"
+                  >
+                    Dirección
+                  </label>
+
+                  <div className="relative">
+                    <Home className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
+
+                    <input
+                      id="direccion"
+                      type="text"
+                      autoComplete="street-address"
+                      value={direccion}
+                      onChange={(event) =>
+                        setDireccion(event.target.value)
+                      }
+                      required
+                      minLength={5}
+                      maxLength={160}
+                      disabled={disabled}
+                      placeholder="Ej. Calle 10 # 20-30"
+                      className={iconInputClass}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="barrio"
+                    className="mb-1.5 block text-sm font-bold text-slate-700"
+                  >
+                    Barrio
+                  </label>
+
+                  <div className="relative">
+                    <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
+
+                    <input
+                      id="barrio"
+                      type="text"
+                      value={barrio}
+                      onChange={(event) =>
+                        setBarrio(event.target.value)
+                      }
+                      required
+                      minLength={2}
+                      maxLength={80}
+                      disabled={disabled}
+                      placeholder="Tu barrio"
+                      className={iconInputClass}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="ciudad"
+                    className="mb-1.5 block text-sm font-bold text-slate-700"
+                  >
+                    Ciudad
+                  </label>
+
+                  <div className="relative">
+                    <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
+
+                    <input
+                      id="ciudad"
+                      type="text"
+                      autoComplete="address-level2"
+                      value={ciudad}
+                      onChange={(event) =>
+                        setCiudad(event.target.value)
+                      }
+                      required
+                      minLength={2}
+                      maxLength={80}
+                      disabled={disabled}
+                      placeholder="Ej. Bello"
+                      className={iconInputClass}
+                    />
+                  </div>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label
+                    htmlFor="departamento"
+                    className="mb-1.5 block text-sm font-bold text-slate-700"
+                  >
+                    Departamento
+                  </label>
+
+                  <div className="relative">
+                    <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
+
+                    <input
+                      id="departamento"
+                      type="text"
+                      autoComplete="address-level1"
+                      value={departamento}
+                      onChange={(event) =>
+                        setDepartamento(
+                          event.target.value,
+                        )
+                      }
+                      required
+                      minLength={2}
+                      maxLength={80}
+                      disabled={disabled}
+                      placeholder="Ej. Antioquia"
+                      className={iconInputClass}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-purple-100 pt-5">
+              <h2 className="text-sm font-black text-purple-900">
+                Seguridad
+              </h2>
+
+              <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="password"
+                    className="mb-1.5 block text-sm font-bold text-slate-700"
+                  >
+                    Contraseña
+                  </label>
+
+                  <div className="relative">
+                    <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
+
+                    <input
+                      id="password"
+                      type={
+                        showPassword
+                          ? "text"
+                          : "password"
+                      }
+                      autoComplete="new-password"
+                      value={password}
+                      onChange={(event) =>
+                        setPassword(event.target.value)
+                      }
+                      required
+                      minLength={8}
+                      disabled={disabled}
+                      placeholder="••••••••"
+                      className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-11 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowPassword(
+                          (value) => !value,
+                        )
+                      }
+                      disabled={disabled}
+                      aria-label={
+                        showPassword
+                          ? "Ocultar contraseña"
+                          : "Mostrar contraseña"
+                      }
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-purple-700 disabled:opacity-60"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="confirmPassword"
+                    className="mb-1.5 block text-sm font-bold text-slate-700"
+                  >
+                    Confirmar contraseña
+                  </label>
+
+                  <div className="relative">
+                    <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-purple-500" />
+
+                    <input
+                      id="confirmPassword"
+                      type={
+                        showConfirmPassword
+                          ? "text"
+                          : "password"
+                      }
+                      autoComplete="new-password"
+                      value={confirmPassword}
+                      onChange={(event) =>
+                        setConfirmPassword(
+                          event.target.value,
+                        )
+                      }
+                      required
+                      minLength={8}
+                      disabled={disabled}
+                      placeholder="••••••••"
+                      className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-11 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:opacity-60"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowConfirmPassword(
+                          (value) => !value,
+                        )
+                      }
+                      disabled={disabled}
+                      aria-label={
+                        showConfirmPassword
+                          ? "Ocultar contraseña"
+                          : "Mostrar contraseña"
+                      }
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-purple-700 disabled:opacity-60"
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Usa mínimo 8 caracteres e incluye una
+                mayúscula, una minúscula, un número y un
+                símbolo.
+              </p>
+            </div>
+
             <div className="space-y-2 rounded-xl border border-purple-100 bg-purple-50/60 p-4">
               <label className="flex items-start gap-3 text-xs leading-5 text-slate-600">
                 <input
@@ -655,7 +928,10 @@ export default function RegisterPage() {
             </div>
 
             {error && (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700">
+              <div
+                role="alert"
+                className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+              >
                 {error}
               </div>
             )}
