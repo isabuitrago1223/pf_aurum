@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import {
   ArrowLeft,
   CalendarDays,
+  CheckCircle2,
   Eye,
   EyeOff,
   Home,
+  Info,
   LockKeyhole,
   Mail,
   MapPin,
@@ -37,6 +39,7 @@ type ErrorResponse = {
 
 export default function RegisterPage() {
   const router = useRouter();
+  const googleSectionRef = useRef<HTMLDivElement>(null);
 
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
@@ -63,6 +66,78 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  const allPoliciesAccepted =
+    acceptedTerms && acceptedPrivacy && acceptedDataPolicy;
+
+  function isEmailRegistrationEmpty() {
+    return (
+      !nombre.trim() &&
+      !apellido.trim() &&
+      !email.trim() &&
+      !telefono.trim() &&
+      !cedula.trim() &&
+      !fechaNacimiento &&
+      !direccion.trim() &&
+      !barrio.trim() &&
+      !ciudad.trim() &&
+      !departamento.trim() &&
+      !password &&
+      !confirmPassword
+    );
+  }
+
+  function goToGoogleIfAppropriate(
+    nextTerms: boolean,
+    nextPrivacy: boolean,
+    nextDataPolicy: boolean,
+  ) {
+    const allAccepted =
+      nextTerms && nextPrivacy && nextDataPolicy;
+
+    if (!allAccepted || !isEmailRegistrationEmpty()) {
+      return;
+    }
+
+    setError("");
+
+    window.setTimeout(() => {
+      googleSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 100);
+  }
+
+  function handleTermsChange(checked: boolean) {
+    setAcceptedTerms(checked);
+
+    goToGoogleIfAppropriate(
+      checked,
+      acceptedPrivacy,
+      acceptedDataPolicy,
+    );
+  }
+
+  function handlePrivacyChange(checked: boolean) {
+    setAcceptedPrivacy(checked);
+
+    goToGoogleIfAppropriate(
+      acceptedTerms,
+      checked,
+      acceptedDataPolicy,
+    );
+  }
+
+  function handleDataPolicyChange(checked: boolean) {
+    setAcceptedDataPolicy(checked);
+
+    goToGoogleIfAppropriate(
+      acceptedTerms,
+      acceptedPrivacy,
+      checked,
+    );
+  }
 
   function saveSession(data: RegisterResponse) {
     localStorage.setItem("aurum_token", data.token);
@@ -101,9 +176,26 @@ export default function RegisterPage() {
     const cleanCiudad = ciudad.trim();
     const cleanDepartamento = departamento.trim();
 
-    if (cleanNombre.length < 2 || cleanApellido.length < 2) {
+    if (!cleanNombre || !cleanApellido) {
+      setError(
+        "Completa tu nombre y apellido para crear la cuenta con correo.",
+      );
+      return;
+    }
+
+    if (
+      cleanNombre.length < 2 ||
+      cleanApellido.length < 2
+    ) {
       setError(
         "El nombre y el apellido deben tener al menos 2 caracteres.",
+      );
+      return;
+    }
+
+    if (!cleanCedula) {
+      setError(
+        "Ingresa tu cédula para crear la cuenta con correo.",
       );
       return;
     }
@@ -115,21 +207,58 @@ export default function RegisterPage() {
       return;
     }
 
-    if (!/^\+?[0-9\s-]{7,20}$/.test(cleanTelefono)) {
+    if (!fechaNacimiento) {
       setError(
-        "Ingresa un número de teléfono válido.",
+        "Selecciona tu fecha de nacimiento para continuar.",
       );
       return;
     }
 
-    if (!fechaNacimiento) {
-      setError("Selecciona tu fecha de nacimiento.");
+    if (!cleanEmail) {
+      setError(
+        "Ingresa tu correo electrónico para crear la cuenta.",
+      );
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setError("Ingresa un correo electrónico válido.");
+      return;
+    }
+
+    if (!cleanTelefono) {
+      setError(
+        "Ingresa tu número de teléfono para continuar.",
+      );
+      return;
+    }
+
+    if (!/^\+?[0-9\s-]{7,20}$/.test(cleanTelefono)) {
+      setError("Ingresa un número de teléfono válido.");
+      return;
+    }
+
+    if (!cleanDireccion) {
+      setError(
+        "Ingresa tu dirección para crear la cuenta con correo.",
+      );
       return;
     }
 
     if (cleanDireccion.length < 5) {
       setError(
         "La dirección debe tener al menos 5 caracteres.",
+      );
+      return;
+    }
+
+    if (
+      !cleanBarrio ||
+      !cleanCiudad ||
+      !cleanDepartamento
+    ) {
+      setError(
+        "Completa barrio, ciudad y departamento para continuar.",
       );
       return;
     }
@@ -145,10 +274,22 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!password) {
+      setError(
+        "Crea una contraseña para registrar tu cuenta.",
+      );
+      return;
+    }
+
     if (!validatePassword(password)) {
       setError(
         "La contraseña debe tener mínimo 8 caracteres e incluir mayúscula, minúscula, número y símbolo.",
       );
+      return;
+    }
+
+    if (!confirmPassword) {
+      setError("Confirma tu contraseña para continuar.");
       return;
     }
 
@@ -157,13 +298,9 @@ export default function RegisterPage() {
       return;
     }
 
-    if (
-      !acceptedTerms ||
-      !acceptedPrivacy ||
-      !acceptedDataPolicy
-    ) {
+    if (!allPoliciesAccepted) {
       setError(
-        "Debes aceptar los términos, la política de privacidad y la política de tratamiento de datos.",
+        "Acepta los términos, la política de privacidad y la política de tratamiento de datos para crear tu cuenta.",
       );
       return;
     }
@@ -260,6 +397,14 @@ export default function RegisterPage() {
     credential: string,
   ) {
     setError("");
+
+    if (!allPoliciesAccepted) {
+      setError(
+        "Antes de continuar con Google, acepta las tres políticas de registro.",
+      );
+      return;
+    }
+
     setGoogleLoading(true);
 
     try {
@@ -293,17 +438,6 @@ export default function RegisterPage() {
         }
 
         if (response.status === 400) {
-          if (
-            !acceptedTerms ||
-            !acceptedPrivacy ||
-            !acceptedDataPolicy
-          ) {
-            setError(
-              "Si es tu primera vez en AURUM, acepta los términos, la política de privacidad y la política de tratamiento de datos antes de continuar con Google.",
-            );
-            return;
-          }
-
           setError(
             errorData.message ??
               errorData.error ??
@@ -407,24 +541,48 @@ export default function RegisterPage() {
         </header>
 
         <div className="px-6 py-6 sm:px-8">
-          <GoogleAuthButton
-            mode="register"
-            disabled={disabled}
-            onCredential={handleGoogleCredential}
-            onError={setError}
-          />
+          <div
+            ref={googleSectionRef}
+            className={
+              allPoliciesAccepted
+                ? "scroll-mt-8 rounded-2xl border border-purple-300 bg-purple-50/70 p-4 shadow-sm transition"
+                : "scroll-mt-8"
+            }
+          >
+            <GoogleAuthButton
+              mode="register"
+              disabled={disabled}
+              onCredential={handleGoogleCredential}
+              onError={setError}
+            />
 
-          <p className="mt-2 text-center text-xs leading-5 text-slate-500">
-            Si es tu primera vez en AURUM, acepta las
-            políticas de registro antes de continuar con
-            Google.
-          </p>
+            {allPoliciesAccepted ? (
+              <div className="mt-3 flex items-start gap-3 rounded-xl border border-purple-200 bg-white px-4 py-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-purple-700" />
 
-          {googleLoading && (
-            <p className="mt-2 text-center text-xs font-medium text-slate-500">
-              Continuando con Google...
-            </p>
-          )}
+                <p className="text-xs font-bold leading-5 text-purple-800 sm:text-sm">
+                  ¡Listo! Ya aceptaste las políticas.
+                  Continúa con Google.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-3 flex items-start gap-3 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3">
+                <Info className="mt-0.5 h-5 w-5 shrink-0 text-purple-700" />
+
+                <p className="text-xs font-semibold leading-5 text-purple-800 sm:text-sm">
+                  ¿Es tu primera vez en AURUM? Acepta las
+                  tres políticas de registro que aparecen
+                  más abajo antes de continuar con Google.
+                </p>
+              </div>
+            )}
+
+            {googleLoading && (
+              <p className="mt-2 text-center text-xs font-medium text-purple-700">
+                Continuando con Google...
+              </p>
+            )}
+          </div>
 
           <div className="my-5 flex items-center gap-3">
             <div className="h-px flex-1 bg-slate-200" />
@@ -439,6 +597,7 @@ export default function RegisterPage() {
           <form
             className="space-y-5"
             onSubmit={handleSubmit}
+            noValidate
           >
             <div>
               <h2 className="text-sm font-black text-purple-900">
@@ -465,7 +624,6 @@ export default function RegisterPage() {
                       onChange={(event) =>
                         setNombre(event.target.value)
                       }
-                      required
                       minLength={2}
                       maxLength={80}
                       disabled={disabled}
@@ -494,7 +652,6 @@ export default function RegisterPage() {
                       onChange={(event) =>
                         setApellido(event.target.value)
                       }
-                      required
                       minLength={2}
                       maxLength={80}
                       disabled={disabled}
@@ -525,7 +682,6 @@ export default function RegisterPage() {
                         ),
                       )
                     }
-                    required
                     minLength={6}
                     maxLength={15}
                     disabled={disabled}
@@ -554,7 +710,6 @@ export default function RegisterPage() {
                           event.target.value,
                         )
                       }
-                      required
                       disabled={disabled}
                       className={iconInputClass}
                     />
@@ -580,7 +735,6 @@ export default function RegisterPage() {
                       onChange={(event) =>
                         setEmail(event.target.value)
                       }
-                      required
                       maxLength={120}
                       disabled={disabled}
                       placeholder="ejemplo@correo.com"
@@ -608,7 +762,6 @@ export default function RegisterPage() {
                       onChange={(event) =>
                         setTelefono(event.target.value)
                       }
-                      required
                       minLength={7}
                       maxLength={20}
                       disabled={disabled}
@@ -645,7 +798,6 @@ export default function RegisterPage() {
                       onChange={(event) =>
                         setDireccion(event.target.value)
                       }
-                      required
                       minLength={5}
                       maxLength={160}
                       disabled={disabled}
@@ -673,7 +825,6 @@ export default function RegisterPage() {
                       onChange={(event) =>
                         setBarrio(event.target.value)
                       }
-                      required
                       minLength={2}
                       maxLength={80}
                       disabled={disabled}
@@ -702,7 +853,6 @@ export default function RegisterPage() {
                       onChange={(event) =>
                         setCiudad(event.target.value)
                       }
-                      required
                       minLength={2}
                       maxLength={80}
                       disabled={disabled}
@@ -733,7 +883,6 @@ export default function RegisterPage() {
                           event.target.value,
                         )
                       }
-                      required
                       minLength={2}
                       maxLength={80}
                       disabled={disabled}
@@ -774,7 +923,6 @@ export default function RegisterPage() {
                       onChange={(event) =>
                         setPassword(event.target.value)
                       }
-                      required
                       minLength={8}
                       disabled={disabled}
                       placeholder="••••••••"
@@ -830,7 +978,6 @@ export default function RegisterPage() {
                           event.target.value,
                         )
                       }
-                      required
                       minLength={8}
                       disabled={disabled}
                       placeholder="••••••••"
@@ -869,13 +1016,17 @@ export default function RegisterPage() {
               </p>
             </div>
 
-            <div className="space-y-2 rounded-xl border border-purple-100 bg-purple-50/60 p-4">
+            <div className="space-y-2 rounded-xl border border-purple-200 bg-purple-50/70 p-4">
+              <p className="mb-2 text-xs font-bold text-purple-900">
+                Políticas necesarias para crear tu cuenta
+              </p>
+
               <label className="flex items-start gap-3 text-xs leading-5 text-slate-600">
                 <input
                   type="checkbox"
                   checked={acceptedTerms}
                   onChange={(event) =>
-                    setAcceptedTerms(
+                    handleTermsChange(
                       event.target.checked,
                     )
                   }
@@ -894,7 +1045,7 @@ export default function RegisterPage() {
                   type="checkbox"
                   checked={acceptedPrivacy}
                   onChange={(event) =>
-                    setAcceptedPrivacy(
+                    handlePrivacyChange(
                       event.target.checked,
                     )
                   }
@@ -912,7 +1063,7 @@ export default function RegisterPage() {
                   type="checkbox"
                   checked={acceptedDataPolicy}
                   onChange={(event) =>
-                    setAcceptedDataPolicy(
+                    handleDataPolicyChange(
                       event.target.checked,
                     )
                   }
@@ -930,7 +1081,7 @@ export default function RegisterPage() {
             {error && (
               <div
                 role="alert"
-                className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+                className="rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-800"
               >
                 {error}
               </div>
