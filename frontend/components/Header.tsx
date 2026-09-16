@@ -584,9 +584,9 @@ export default function Header() {
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-950 text-xs font-black uppercase text-amber-300">
                     {user
                       ? user.nombre
-                          .trim()
-                          .charAt(0)
-                          .toUpperCase()
+                        .trim()
+                        .charAt(0)
+                        .toUpperCase()
                       : "U"}
                   </div>
 
@@ -594,8 +594,8 @@ export default function Header() {
                     <p className="max-w-[110px] truncate text-xs font-black leading-none text-purple-950">
                       {user
                         ? user.nombre.split(
-                            " ",
-                          )[0]
+                          " ",
+                        )[0]
                         : "Usuario"}
                     </p>
 
@@ -611,7 +611,7 @@ export default function Header() {
                       userMenuOpen
                         ? "rotate-180"
                         : ""
-                    }`}
+                      }`}
                   />
                 </button>
 
@@ -660,7 +660,7 @@ export default function Header() {
 
                                 <span className="mt-2 inline-flex rounded-full bg-purple-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-purple-700">
                                   {user.role ===
-                                  "CLIENTE"
+                                    "CLIENTE"
                                     ? "Cliente"
                                     : user.role}
                                 </span>
@@ -671,25 +671,42 @@ export default function Header() {
                           <div className="border-t border-purple-50">
                             {user.role ===
                               "CLIENTE" && (
+                                <Link
+                                  href="/pedidos"
+                                  onClick={() =>
+                                    setUserMenuOpen(
+                                      false,
+                                    )
+                                  }
+                                  className="flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 transition hover:bg-purple-50 hover:text-purple-950"
+                                >
+                                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-700">
+                                    <ShoppingBag className="h-4 w-4" />
+                                  </div>
+
+                                  <span>
+                                    Mis pedidos
+                                  </span>
+                                </Link>
+                              )}
+
+                            {user.role === "ADMIN" && (
                               <Link
-                                href="/pedidos"
+                                href="/admin"
                                 onClick={() =>
-                                  setUserMenuOpen(
-                                    false,
-                                  )
+                                  setUserMenuOpen(false)
                                 }
                                 className="flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 transition hover:bg-purple-50 hover:text-purple-950"
                               >
                                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-700">
-                                  <ShoppingBag className="h-4 w-4" />
+                                  <User className="h-4 w-4" />
                                 </div>
 
                                 <span>
-                                  Mis pedidos
+                                  Panel administrativo
                                 </span>
                               </Link>
                             )}
-
                             <button
                               type="button"
                               onClick={handleLogout}
@@ -814,18 +831,18 @@ export default function Header() {
                       }
                       className={`flex items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-bold transition ${
                         isOpen
-                          ? "bg-purple-900 text-white"
-                          : "text-slate-700 hover:bg-purple-50 hover:text-purple-900"
-                      }`}
+                        ? "bg-purple-900 text-white"
+                        : "text-slate-700 hover:bg-purple-50 hover:text-purple-900"
+                        }`}
                     >
                       {category.label}
 
                       <ChevronDown
                         className={`h-3.5 w-3.5 transition-transform ${
                           isOpen
-                            ? "rotate-180"
-                            : ""
-                        }`}
+                          ? "rotate-180"
+                          : ""
+                          }`}
                       />
                     </button>
 
@@ -1047,16 +1064,28 @@ export default function Header() {
 
                     {user.role ===
                       "CLIENTE" && (
+                        <Link
+                          href="/pedidos"
+                          onClick={() =>
+                            setMobileOpen(
+                              false,
+                            )
+                          }
+                          className="block rounded-xl px-4 py-3 text-sm font-bold text-purple-950 hover:bg-purple-50"
+                        >
+                          Mis pedidos
+                        </Link>
+                      )}
+
+                    {user.role === "ADMIN" && (
                       <Link
-                        href="/pedidos"
+                        href="/admin"
                         onClick={() =>
-                          setMobileOpen(
-                            false,
-                          )
+                          setMobileOpen(false)
                         }
                         className="block rounded-xl px-4 py-3 text-sm font-bold text-purple-950 hover:bg-purple-50"
                       >
-                        Mis pedidos
+                        Panel administrativo
                       </Link>
                     )}
 

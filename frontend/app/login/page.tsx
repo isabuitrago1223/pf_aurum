@@ -48,10 +48,14 @@ export default function LoginPage() {
       JSON.stringify(data.user),
     );
 
-    router.push("/");
+    if (data.user.role === "ADMIN") {
+      router.push("/admin");
+    } else {
+      router.push("/");
+    }
+
     router.refresh();
   }
-
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
   ) {
@@ -139,8 +143,8 @@ export default function LoginPage() {
         if (response.status === 403) {
           setError(
             errorData.message ??
-              errorData.error ??
-              "Tu cuenta no tiene permitido iniciar sesión con Google.",
+            errorData.error ??
+            "Tu cuenta no tiene permitido iniciar sesión con Google.",
           );
           return;
         }
@@ -148,8 +152,8 @@ export default function LoginPage() {
         if (response.status === 409) {
           setError(
             errorData.message ??
-              errorData.error ??
-              "Este correo ya está vinculado a otra cuenta de Google.",
+            errorData.error ??
+            "Este correo ya está vinculado a otra cuenta de Google.",
           );
           return;
         }
@@ -170,8 +174,8 @@ export default function LoginPage() {
 
         setError(
           errorData.message ??
-            errorData.error ??
-            "No fue posible iniciar sesión con Google.",
+          errorData.error ??
+          "No fue posible iniciar sesión con Google.",
         );
         return;
       }
