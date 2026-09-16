@@ -8,53 +8,28 @@ import {
   useState,
 } from "react";
 
-export type ProductCustomization = Record<
-  string,
-  string | string[]
->;
-
 export type CartItem = {
-  cartItemId: string;
   productId: string;
   nombre: string;
   precio: string;
   imagen: string | null;
   cantidad: number;
-  personalizacion?: ProductCustomization;
 };
-
-type NewCartItem = Omit<CartItem, "cartItemId">;
 
 type CartContextValue = {
   items: CartItem[];
   totalItems: number;
-  addItem: (item: NewCartItem) => void;
-  removeItem: (cartItemId: string) => void;
-  updateQuantity: (
-    cartItemId: string,
-    cantidad: number,
-  ) => void;
+  addItem: (item: CartItem) => void;
+  removeItem: (productId: string) => void;
+  updateQuantity: (productId: string, cantidad: number) => void;
   clearCart: () => void;
 };
 
-const CartContext = createContext<
-  CartContextValue | undefined
->(undefined);
+const CartContext = createContext<CartContextValue | undefined>(
+  undefined,
+);
 
 const STORAGE_KEY = "aurum_cart";
-
-function createCartItemId(
-  productId: string,
-  personalizacion?: ProductCustomization,
-) {
-  if (!personalizacion) {
-    return productId;
-  }
-
-  return `${productId}-${JSON.stringify(
-    personalizacion,
-  )}`;
-}
 
 export function CartProvider({
   children,
@@ -65,27 +40,14 @@ export function CartProvider({
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const storedCart =
-      localStorage.getItem(STORAGE_KEY);
+    const storedCart = localStorage.getItem(STORAGE_KEY);
 
     if (storedCart) {
       try {
         const parsedCart = JSON.parse(storedCart);
 
         if (Array.isArray(parsedCart)) {
-          const normalizedCart = parsedCart.map(
-            (item) => ({
-              ...item,
-              cartItemId:
-                item.cartItemId ??
-                createCartItemId(
-                  item.productId,
-                  item.personalizacion,
-                ),
-            }),
-          );
-
-          setItems(normalizedCart);
+          setItems(parsedCart);
         }
       } catch {
         localStorage.removeItem(STORAGE_KEY);
@@ -100,71 +62,51 @@ export function CartProvider({
       return;
     }
 
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(items),
-    );
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }, [items, loaded]);
 
-  function addItem(item: NewCartItem) {
-    const cartItemId = createCartItemId(
-      item.productId,
-      item.personalizacion,
-    );
-
+  function addItem(item: CartItem) {
     setItems((currentItems) => {
       const existingItem = currentItems.find(
         (currentItem) =>
-          currentItem.cartItemId === cartItemId,
+          currentItem.productId === item.productId,
       );
 
       if (existingItem) {
-        return currentItems.map(
-          (currentItem) =>
-            currentItem.cartItemId === cartItemId
-              ? {
-                  ...currentItem,
-                  cantidad:
-                    currentItem.cantidad +
-                    item.cantidad,
-                }
-              : currentItem,
+        return currentItems.map((currentItem) =>
+          currentItem.productId === item.productId
+            ? {
+                ...currentItem,
+                cantidad:
+                  currentItem.cantidad + item.cantidad,
+              }
+            : currentItem,
         );
       }
 
-      return [
-        ...currentItems,
-        {
-          ...item,
-          cartItemId,
-        },
-      ];
+      return [...currentItems, item];
     });
   }
 
-  function removeItem(cartItemId: string) {
+  function removeItem(productId: string) {
     setItems((currentItems) =>
       currentItems.filter(
-        (item) =>
-          item.cartItemId !== cartItemId,
+        (item) => item.productId !== productId,
       ),
     );
   }
 
   function updateQuantity(
-    cartItemId: string,
+    productId: string,
     cantidad: number,
   ) {
-    if (
-      !Number.isInteger(cantidad) ||
-      cantidad < 1
-    ) {
+    if (!Number.isInteger(cantidad) || cantidad < 1) {
       return;
     }
 
     setItems((currentItems) =>
       currentItems.map((item) =>
-        item.cartItemId === cartItemId
+        item.productId === productId
           ? {
               ...item,
               cantidad,
@@ -179,8 +121,7 @@ export function CartProvider({
   }
 
   const totalItems = items.reduce(
-    (total, item) =>
-      total + item.cantidad,
+    (total, item) => total + item.cantidad,
     0,
   );
 
