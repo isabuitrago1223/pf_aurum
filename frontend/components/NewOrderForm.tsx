@@ -253,7 +253,8 @@ export default function NewOrderForm() {
     useState<FieldErrors>({});
   const [paymentMessage, setPaymentMessage] =
     useState("");
-
+  const [acceptanceError, setAcceptanceError] =
+    useState("");
   const [createdOrder, setCreatedOrder] = useState<{
     id: string;
     numeroPedido: string;
@@ -606,6 +607,7 @@ export default function NewOrderForm() {
   ) {
     try {
       setAcceptanceLoading(true);
+      setAcceptanceError("");
 
       const response = await fetch(
         `${apiUrl}/api/payments/wompi/acceptance`,
@@ -647,6 +649,7 @@ export default function NewOrderForm() {
         data as WompiAcceptanceResponse;
 
       setWompiAcceptance(acceptanceData);
+      setAcceptanceError("");
 
       return acceptanceData;
     } finally {
@@ -853,7 +856,7 @@ export default function NewOrderForm() {
           return;
         }
 
-        setError(
+        setAcceptanceError(
           acceptanceError instanceof Error
             ? acceptanceError.message
             : "No fue posible cargar los términos de Wompi.",
@@ -1052,9 +1055,7 @@ export default function NewOrderForm() {
           clearCart();
         }
 
-        setPaymentMessage(
-          "La solicitud de pago fue enviada a Nequi. Revisa la aplicación Nequi en tu celular y acepta el pago.",
-        );
+        setPaymentMessage("");
         return;
       }
 
@@ -1092,6 +1093,7 @@ export default function NewOrderForm() {
 
     try {
       setError("");
+      setAcceptanceError("");
 
       await loadWompiAcceptanceData(
         token,
@@ -1104,7 +1106,7 @@ export default function NewOrderForm() {
         return;
       }
 
-      setError(
+      setAcceptanceError(
         acceptanceError instanceof Error
           ? acceptanceError.message
           : "No fue posible cargar los términos de Wompi.",
@@ -1832,7 +1834,7 @@ export default function NewOrderForm() {
                                 barrioEntrega: "",
                               }));
                             }}
-                            className={`${selectClass} ${ 
+                            className={`${selectClass} ${
                               fieldErrors.departamentoEntrega
                                 ? "border-red-400 focus:border-red-500 focus:ring-red-100"
                                 : ""
@@ -1890,7 +1892,7 @@ export default function NewOrderForm() {
                                 barrioEntrega: "",
                               }));
                             }}
-                            className={`${selectClass} ${ 
+                            className={`${selectClass} ${
                               fieldErrors.ciudadEntrega
                                 ? "border-red-400 focus:border-red-500 focus:ring-red-100"
                                 : ""
@@ -1946,7 +1948,7 @@ export default function NewOrderForm() {
                                 event.target.value,
                               )
                             }
-                            className={`${selectClass} ${ 
+                            className={`${selectClass} ${
                               fieldErrors.barrioEntrega
                                 ? "border-red-400 focus:border-red-500 focus:ring-red-100"
                                 : ""
@@ -2375,10 +2377,8 @@ export default function NewOrderForm() {
                     !wompiAcceptance && (
                       <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
                         <p className="font-bold">
-                          No fue posible
-                          cargar todavía
-                          los términos de
-                          Wompi.
+                          {acceptanceError ||
+                            "No fue posible cargar todavía los términos de Wompi."}
                         </p>
 
                         <button
