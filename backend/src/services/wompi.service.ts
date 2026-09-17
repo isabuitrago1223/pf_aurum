@@ -61,6 +61,7 @@ export interface CreateWompiTransactionInput {
   reference: string;
   amountInCents: number;
   customerEmail: string;
+  redirectUrl?: string;
   paymentMethod: Record<string, unknown>;
 }
 
@@ -70,6 +71,14 @@ export interface WompiTransaction {
   status: WompiTransactionStatus;
   amount_in_cents: number;
   currency: string;
+  payment_method?: {
+    type?: string;
+    extra?: {
+      async_payment_url?: string;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
 }
 
 interface WompiTransactionResponse {
@@ -93,6 +102,7 @@ export async function createWompiTransaction(
       currency: 'COP',
       customer_email: input.customerEmail,
       payment_method: input.paymentMethod,
+      redirect_url: input.redirectUrl,
       reference: input.reference,
       signature
     })
@@ -142,4 +152,22 @@ export async function getWompiMerchantInfo() {
   }
 
   return body as WompiMerchantInfo;
+}
+
+export interface WompiPseFinancialInstitution {
+  financial_institution_code: string;
+  financial_institution_name: string;
+}
+
+interface WompiPseFinancialInstitutionsResponse {
+  data: WompiPseFinancialInstitution[];
+}
+
+export async function getWompiPseFinancialInstitutions() {
+  return wompiRequest<WompiPseFinancialInstitutionsResponse>(
+    '/pse/financial_institutions',
+    {
+      method: 'GET'
+    }
+  );
 }

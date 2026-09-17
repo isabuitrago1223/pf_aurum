@@ -6,7 +6,9 @@ import { prisma } from '../config/prisma.js';
 import type { AuthenticatedRequest } from '../middlewares/auth.middleware.js';
 import {
   createWompiTransaction,
-  getWompiMerchantInfo
+  getWompiMerchantInfo,
+  getWompiPseFinancialInstitutions,
+  getWompiTransaction
 } from '../services/wompi.service.js';
 import { AppError } from '../utils/app-error.js';
 
@@ -121,6 +123,157 @@ export async function getWompiAcceptanceData(
     personalDataAuthPermalink:
       merchantInfo.data.presigned_personal_data_auth.permalink
   });
+}
+
+export async function getWompiPseInstitutions(
+  _req: Request,
+  res: Response
+) {
+  const wompiResponse =
+    await getWompiPseFinancialInstitutions();
+
+  return res.status(200).json({
+    institutions: wompiResponse.data
+  });
+}
+
+async function waitForPseAsyncPaymentUrl(
+  transactionId: string
+) {
+  const maxAttempts = 10;
+  const delayMs = 1000;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const wompiResponse =
+      await getWompiTransaction(transactionId);
+
+    const transaction = wompiResponse.data;
+
+    if (
+      transaction.payment_method?.extra?.async_payment_url
+    ) {
+      return transaction;
+    }
+
+    if (
+      transaction.status === 'DECLINED' ||
+      transaction.status === 'VOIDED' ||
+      transaction.status === 'ERROR'
+    ) {
+      return transaction;
+    }
+
+    await new Promise((resolve) =>
+      setTimeout(resolve, delayMs)
+    );
+  }
+
+  return null;
+}
+
+function mapWompiStatusToPaymentStatus(
+  status: string
+): 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' {
+  if (status === 'APPROVED') {
+    return 'APROBADO';
+  }
+
+  if (
+    status === 'DECLINED' ||
+    status === 'VOIDED' ||
+    status === 'ERROR'
+  ) {
+    return 'RECHAZADO';
+  }
+
+  return 'PENDIENTE';
+}
+
+async function syncWompiPayment(
+  payment: {
+    id: string;
+    orderId: string;
+    monto: unknown;
+    referencia: string | null;
+    proveedorTransaccion: string | null;
+    pagadoAt: Date | null;
+  }
+) {
+  if (!payment.proveedorTransaccion) {
+    throw new AppError(
+      409,
+      'El pago pendiente no tiene una transacción de Wompi asociada.'
+    );
+  }
+
+  const wompiResponse = await getWompiTransaction(
+    payment.proveedorTransaccion
+  );
+
+  const transaction = wompiResponse.data;
+
+  if (payment.referencia !== transaction.reference) {
+    throw new AppError(
+      409,
+      'La referencia de Wompi no coincide con el pago registrado.'
+    );
+  }
+
+  const expectedAmountInCents = Math.round(
+    Number(payment.monto) * 100
+  );
+
+  if (
+    expectedAmountInCents !== transaction.amount_in_cents
+  ) {
+    throw new AppError(
+      409,
+      'El monto de Wompi no coincide con el pago registrado.'
+    );
+  }
+
+  const newStatus = mapWompiStatusToPaymentStatus(
+    transaction.status
+  );
+
+  const updatedPayment = await prisma.$transaction(
+    async (tx) => {
+      const updated = await tx.payment.update({
+        where: {
+          id: payment.id
+        },
+        data: {
+          estado: newStatus,
+          respuestaPasarela: JSON.parse(
+            JSON.stringify(wompiResponse)
+          ),
+          ...(newStatus === 'APROBADO' &&
+            !payment.pagadoAt
+            ? { pagadoAt: new Date() }
+            : {})
+        }
+      });
+
+      if (newStatus === 'APROBADO') {
+        await tx.order.updateMany({
+          where: {
+            id: payment.orderId,
+            estado: 'PENDIENTE'
+          },
+          data: {
+            estado: 'EN_PREPARACION'
+          }
+        });
+      }
+
+      return updated;
+    }
+  );
+
+  return {
+    payment: updatedPayment,
+    transaction
+  };
 }
 
 const createWompiPaymentSchema = z.object({
@@ -253,10 +406,30 @@ export async function createWompiPayment(
   });
 
   if (existingPayment) {
-    throw new AppError(
-      409,
-      'Ya existe un pago pendiente o aprobado para este pedido.'
+    if (existingPayment.estado === 'APROBADO') {
+      throw new AppError(
+        409,
+        'Este pedido ya tiene un pago aprobado.'
+      );
+    }
+
+    const synced = await syncWompiPayment(
+      existingPayment
     );
+
+    if (synced.payment.estado === 'APROBADO') {
+      throw new AppError(
+        409,
+        'El pago pendiente ya fue aprobado por Wompi y AURUM actualizó el pedido.'
+      );
+    }
+
+    if (synced.payment.estado === 'PENDIENTE') {
+      throw new AppError(
+        409,
+        'Ya existe una transacción de Wompi pendiente para este pedido.'
+      );
+    }
   }
 
   const amountInCents = Math.round(Number(order.total) * 100);
@@ -268,6 +441,10 @@ export async function createWompiPayment(
     reference,
     amountInCents,
     customerEmail: order.emailContacto,
+    redirectUrl:
+      data.metodo === 'PSE'
+        ? `${env.FRONTEND_URL}/pagos/wompi/retorno`
+        : undefined,
     paymentMethod: data.paymentMethod
   });
 
@@ -285,8 +462,8 @@ export async function createWompiPayment(
         transaction.status === 'APPROVED'
           ? 'APROBADO'
           : transaction.status === 'DECLINED' ||
-              transaction.status === 'VOIDED' ||
-              transaction.status === 'ERROR'
+            transaction.status === 'VOIDED' ||
+            transaction.status === 'ERROR'
             ? 'RECHAZADO'
             : 'PENDIENTE',
       ...(transaction.status === 'APPROVED'
@@ -295,9 +472,118 @@ export async function createWompiPayment(
     }
   });
 
+  const responseTransaction =
+    data.metodo === 'PSE'
+      ? (await waitForPseAsyncPaymentUrl(
+        transaction.id
+      )) ?? transaction
+      : transaction;
+
   return res.status(201).json({
     message: 'Transaccion de Wompi creada correctamente.',
     payment,
+    transaction: responseTransaction
+  });
+}
+
+export async function getWompiPaymentStatus(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  const transactionId = z.string().min(1).parse(
+    req.params.transactionId
+  );
+
+  if (!req.auth) {
+    throw new AppError(
+      401,
+      'Autenticacion requerida.'
+    );
+  }
+
+  const payment = await prisma.payment.findFirst({
+    where: {
+      proveedorTransaccion: transactionId,
+      order: {
+        userId: req.auth.userId
+      }
+    }
+  });
+
+  if (!payment) {
+    throw new AppError(
+      404,
+      'Pago de Wompi no encontrado para este cliente.'
+    );
+  }
+
+  const wompiResponse =
+    await getWompiTransaction(transactionId);
+
+  const transaction = wompiResponse.data;
+
+  if (payment.referencia !== transaction.reference) {
+    throw new AppError(
+      409,
+      'La referencia de Wompi no coincide con el pago registrado.'
+    );
+  }
+
+  const expectedAmountInCents = Math.round(
+    Number(payment.monto) * 100
+  );
+
+  if (
+    expectedAmountInCents !== transaction.amount_in_cents
+  ) {
+    throw new AppError(
+      409,
+      'El monto de Wompi no coincide con el pago registrado.'
+    );
+  }
+
+  const newStatus = mapWompiStatusToPaymentStatus(
+    transaction.status
+  );
+
+  const updatedPayment = await prisma.$transaction(
+    async (tx) => {
+      const updated = await tx.payment.update({
+        where: {
+          id: payment.id
+        },
+        data: {
+          estado: newStatus,
+          respuestaPasarela: JSON.parse(
+            JSON.stringify(wompiResponse)
+          ),
+          ...(newStatus === 'APROBADO' &&
+            !payment.pagadoAt
+            ? { pagadoAt: new Date() }
+            : {})
+        }
+      });
+
+      if (newStatus === 'APROBADO') {
+        await tx.order.updateMany({
+          where: {
+            id: payment.orderId,
+            estado: 'PENDIENTE'
+          },
+          data: {
+            estado: 'EN_PREPARACION'
+          }
+        });
+      }
+
+      return updated;
+    }
+  );
+
+  return res.status(200).json({
+    message:
+      'Estado de la transacción Wompi consultado correctamente.',
+    payment: updatedPayment,
     transaction
   });
 }
@@ -357,14 +643,9 @@ export async function handleWompiWebhook(
     );
   }
 
-  const newStatus =
-    transaction.status === 'APPROVED'
-      ? 'APROBADO'
-      : transaction.status === 'DECLINED' ||
-          transaction.status === 'VOIDED' ||
-          transaction.status === 'ERROR'
-        ? 'RECHAZADO'
-        : 'PENDIENTE';
+  const newStatus = mapWompiStatusToPaymentStatus(
+    transaction.status
+  );
 
   const updatedPayment = await prisma.$transaction(async (tx) => {
     const updated = await tx.payment.update({

@@ -4,6 +4,8 @@ import {
   createPayment,
   createWompiPayment,
   getWompiAcceptanceData,
+  getWompiPaymentStatus,
+  getWompiPseInstitutions,
   handleWompiWebhook,
   listAdminPayments,
   updateAdminPaymentStatus
@@ -118,6 +120,20 @@ paymentRouter.get(
   requireAuth,
   requireRole('CLIENTE'),
   asyncHandler(getWompiAcceptanceData)
+);
+
+paymentRouter.get(
+  '/wompi/pse/institutions',
+  requireAuth,
+  requireRole('CLIENTE'),
+  asyncHandler(getWompiPseInstitutions)
+);
+
+paymentRouter.get(
+  '/wompi/:transactionId/status',
+  requireAuth,
+  requireRole('CLIENTE'),
+  asyncHandler(getWompiPaymentStatus)
 );
 
 /**
