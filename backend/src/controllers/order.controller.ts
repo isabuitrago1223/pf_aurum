@@ -3,7 +3,6 @@ import { z } from 'zod';
 
 import { prisma } from '../config/prisma.js';
 import type { AuthenticatedRequest } from '../middlewares/auth.middleware.js';
-import { sendOrderConfirmationEmail } from '../services/mail.service.js';
 import { createOrderReceiptPdf } from '../services/order-receipt.service.js';
 import { AppError } from '../utils/app-error.js';
 
@@ -251,33 +250,6 @@ export async function createOrder(
       }
     });
   });
-
-  try {
-    await sendOrderConfirmationEmail({
-      to: order.emailContacto,
-      nombre: order.nombreContacto,
-      numeroPedido: order.numeroPedido,
-      metodoEntrega: order.metodoEntrega,
-      direccionEntrega: order.direccionEntrega,
-      barrioEntrega: order.barrioEntrega,
-      ciudadEntrega: order.ciudadEntrega,
-      departamentoEntrega: order.departamentoEntrega,
-      subtotal: Number(order.subtotal),
-      costoEnvio: Number(order.costoEnvio),
-      descuento: Number(order.descuento),
-      total: Number(order.total),
-      items: order.items.map((item) => ({
-        nombreProducto: item.nombreProducto,
-        cantidad: item.cantidad,
-        precioUnitario: Number(item.precioUnitario)
-      }))
-    });
-  } catch (error) {
-    console.error(
-      `No fue posible enviar la confirmacion del pedido ${order.numeroPedido}.`,
-      error
-    );
-  }
 
   return res.status(201).json({
     message: 'Pedido creado correctamente.',

@@ -36,9 +36,7 @@ type DeliveryMethod = "DOMICILIO" | "TIENDA";
 
 type PaymentMethod =
   | "NEQUI"
-  | "DAVIPLATA"
-  | "PSE"
-  | "TRANSFERENCIA_BANCARIA";
+  | "PSE";
 
 type MoneyValue = number | string;
 
@@ -64,6 +62,12 @@ type WompiAcceptanceResponse = {
 type WompiPseInstitution = {
   financial_institution_code: string;
   financial_institution_name: string;
+};
+
+const PSE_BANK_DISPLAY_NAMES: Record<string, string> = {
+  "1": "Bancolombia",
+  "2": "Davivienda",
+  "3": "Banco de Bogotá",
 };
 
 type WompiPseInstitutionsResponse = {
@@ -264,6 +268,8 @@ export default function NewOrderForm() {
     useState("CC");
   const [pseDocumentNumber, setPseDocumentNumber] =
     useState("");
+  const [pseAccountType, setPseAccountType] = useState("AHORROS");
+  const [pseAccountNumber, setPseAccountNumber] = useState("");
 
   const [cantidad, setCantidad] = useState(1);
 
@@ -1046,6 +1052,13 @@ export default function NewOrderForm() {
         );
         return;
       }
+    }
+
+    if (!pseAccountNumber.trim()) {
+      setError(
+        "Ingresa un número de cuenta para continuar con el pago por PSE.",
+      );
+      return;
     }
 
     if (!acceptTerms) {
@@ -2381,10 +2394,8 @@ export default function NewOrderForm() {
                         enabled: true,
                       },
                       {
-                        value:
-                          "DAVIPLATA" as PaymentMethod,
-                        label:
-                          "Daviplata",
+                        value: "DAVIPLATA" as PaymentMethod,
+                        label: "Daviplata",
                         enabled: false,
                       },
                       {
@@ -2394,10 +2405,8 @@ export default function NewOrderForm() {
                         enabled: true,
                       },
                       {
-                        value:
-                          "TRANSFERENCIA_BANCARIA" as PaymentMethod,
-                        label:
-                          "Transferencia",
+                        value: "TRANSFERENCIA_BANCARIA" as PaymentMethod,
+                        label: "Transferencia",
                         enabled: false,
                       },
                     ].map(
@@ -2549,7 +2558,9 @@ export default function NewOrderForm() {
                                 }
                               >
                                 {
-                                  institution.financial_institution_name
+                                  PSE_BANK_DISPLAY_NAMES[
+                                  institution.financial_institution_code
+                                  ] ?? institution.financial_institution_name
                                 }
                               </option>
                             ))}
@@ -2621,6 +2632,46 @@ export default function NewOrderForm() {
                             className={fieldClass}
                           />
                         </div>
+                      </div>
+                      <div>
+                        <label className={labelClass}>
+                          Tipo de cuenta
+                        </label>
+
+                        <select
+                          value={pseAccountType}
+                          onChange={(event) =>
+                            setPseAccountType(event.target.value)
+                          }
+                          className={fieldClass}
+                        >
+                          <option value="AHORROS">Cuenta de ahorros</option>
+                          <option value="CORRIENTE">Cuenta corriente</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>
+                          Número de cuenta
+                        </label>
+
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={pseAccountNumber}
+                          onChange={(event) =>
+                            setPseAccountNumber(
+                              event.target.value.replace(/\D/g, "").slice(0, 20),
+                            )
+                          }
+                          placeholder="Ej. 12345678901"
+                          className={fieldClass}
+                          autoComplete="off"
+                        />
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          Dato de demostración. AURUM no almacena ni envía este número a Wompi.
+                        </p>
                       </div>
                     </div>
                   )}
