@@ -1,8 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  FormEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import {
+  Check,
+  ChevronDown,
+  Gift,
+  Heart,
+  Menu,
+  Search,
+  ShoppingBag,
+  Sparkles,
+  User,
+  X,
+} from "lucide-react";
+import {
+  AnimatePresence,
+  motion,
+} from "motion/react";
+
 import { useCart } from "../context/CartContext";
+import CartDrawer from "./CartDrawer";
 
 type StoredUser = {
   id: string;
@@ -11,12 +35,262 @@ type StoredUser = {
   role: string;
 };
 
+type OccasionItem = {
+  label: string;
+  slug: string | null;
+};
+
+type CategoryMenu = {
+  label: string;
+  slug: string;
+  title: string;
+  occasions: OccasionItem[];
+};
+
+const categoryMenus: CategoryMenu[] = [
+  {
+    label: "Anchetas",
+    slug: "anchetas",
+    title: "Ocasiones especiales en anchetas",
+    occasions: [
+      {
+        label: "Día de la Madre",
+        slug: "dia-de-la-madre",
+      },
+      {
+        label: "Día del Padre",
+        slug: "dia-del-padre",
+      },
+      {
+        label: "Cumpleaños",
+        slug: "cumpleanos",
+      },
+      {
+        label: "Amor y Amistad",
+        slug: "amor-y-amistad",
+      },
+      {
+        label: "Navidad",
+        slug: null,
+      },
+      {
+        label: "Empresas",
+        slug: null,
+      },
+      {
+        label: "Otros",
+        slug: null,
+      },
+    ],
+  },
+  {
+    label: "Desayunos",
+    slug: "desayunos",
+    title: "Ocasiones especiales en desayunos",
+    occasions: [
+      {
+        label: "Cumpleaños",
+        slug: "cumpleanos",
+      },
+      {
+        label: "Aniversarios",
+        slug: "aniversario",
+      },
+      {
+        label: "Día de la Madre",
+        slug: "dia-de-la-madre",
+      },
+      {
+        label: "Día del Padre",
+        slug: "dia-del-padre",
+      },
+      {
+        label: "Amor y Amistad",
+        slug: "amor-y-amistad",
+      },
+      {
+        label: "Sorpresas",
+        slug: null,
+      },
+      {
+        label: "Otros",
+        slug: null,
+      },
+    ],
+  },
+  {
+    label: "Ramos",
+    slug: "ramos",
+    title: "Ocasiones especiales en ramos",
+    occasions: [
+      {
+        label: "Cumpleaños",
+        slug: "cumpleanos",
+      },
+      {
+        label: "Aniversarios",
+        slug: "aniversario",
+      },
+      {
+        label: "Amor",
+        slug: "san-valentin",
+      },
+      {
+        label: "Día de la Madre",
+        slug: "dia-de-la-madre",
+      },
+      {
+        label: "Grados",
+        slug: "graduacion",
+      },
+      {
+        label: "Detalles especiales",
+        slug: null,
+      },
+      {
+        label: "Otros",
+        slug: null,
+      },
+    ],
+  },
+  {
+    label: "Regalos",
+    slug: "regalos",
+    title: "Ocasiones especiales en regalos",
+    occasions: [
+      {
+        label: "Cumpleaños",
+        slug: "cumpleanos",
+      },
+      {
+        label: "Aniversarios",
+        slug: "aniversario",
+      },
+      {
+        label: "Amor y Amistad",
+        slug: "amor-y-amistad",
+      },
+      {
+        label: "Graduaciones",
+        slug: "graduacion",
+      },
+      {
+        label: "Navidad",
+        slug: null,
+      },
+      {
+        label: "Empresas",
+        slug: null,
+      },
+      {
+        label: "Otros",
+        slug: null,
+      },
+    ],
+  },
+  {
+    label: "Personalizados",
+    slug: "personalizados",
+    title: "Detalles personalizados",
+    occasions: [
+      {
+        label: "Cumpleaños",
+        slug: "cumpleanos",
+      },
+      {
+        label: "Aniversarios",
+        slug: "aniversario",
+      },
+      {
+        label: "Parejas",
+        slug: "san-valentin",
+      },
+      {
+        label: "Familia",
+        slug: null,
+      },
+      {
+        label: "Amigos",
+        slug: "amor-y-amistad",
+      },
+      {
+        label: "Empresas",
+        slug: null,
+      },
+      {
+        label: "Otros",
+        slug: null,
+      },
+    ],
+  },
+];
+
+const popularSearches = [
+  {
+    label: "Desayunos",
+    href: "/productos?buscar=desayunos",
+  },
+  {
+    label: "Anchetas",
+    href: "/productos?buscar=anchetas",
+  },
+  {
+    label: "Ramos",
+    href: "/productos?buscar=ramos",
+  },
+  {
+    label: "Cumpleaños",
+    href: "/productos?buscar=cumpleanos",
+  },
+  {
+    label: "Grados",
+    href: "/productos?buscar=grados",
+  },
+];
+
 export default function Header() {
-  const [user, setUser] = useState<StoredUser | null>(null);
-  const { totalItems } = useCart();
+  const router = useRouter();
+
+  const [user, setUser] =
+    useState<StoredUser | null>(null);
+
+  const [mobileOpen, setMobileOpen] =
+    useState(false);
+
+  const [userMenuOpen, setUserMenuOpen] =
+    useState(false);
+
+  const [searchOpen, setSearchOpen] =
+    useState(false);
+
+  const [searchQuery, setSearchQuery] =
+    useState("");
+
+  const [mobileSearchQuery, setMobileSearchQuery] =
+    useState("");
+
+  const [
+    activeCategoryMenu,
+    setActiveCategoryMenu,
+  ] = useState<string | null>(null);
+
+  const {
+    totalItems,
+    isCartDrawerOpen,
+    openCartDrawer,
+    closeCartDrawer,
+    cartNotification,
+  } = useCart();
+
+  const userMenuRef =
+    useRef<HTMLDivElement>(null);
+
+  const categoryNavRef =
+    useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("aurum_user");
+    const storedUser =
+      localStorage.getItem("aurum_user");
 
     if (!storedUser) {
       return;
@@ -30,89 +304,870 @@ export default function Header() {
     }
   }, []);
 
+  useEffect(() => {
+    function handleOutsideClick(
+      event: MouseEvent,
+    ) {
+      const target = event.target as Node;
+
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(target)
+      ) {
+        setUserMenuOpen(false);
+      }
+
+      if (
+        categoryNavRef.current &&
+        !categoryNavRef.current.contains(target)
+      ) {
+        setActiveCategoryMenu(null);
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handleOutsideClick,
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleOutsideClick,
+      );
+    };
+  }, []);
+
   function handleLogout() {
     localStorage.removeItem("aurum_token");
     localStorage.removeItem("aurum_user");
 
     setUser(null);
+    setUserMenuOpen(false);
+
     window.location.href = "/";
   }
 
-  return (
-    <header className="border-b border-[#eadfd8] bg-white">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <div>
-          <h1 className="text-2xl font-bold tracking-wide">
-            Aurum
-          </h1>
+  function toggleCategoryMenu(
+    slug: string,
+  ) {
+    setSearchOpen(false);
+    setUserMenuOpen(false);
 
-          <p className="text-sm text-[#7a6f69]">
-            Decoraciones y detalles
-          </p>
+    setActiveCategoryMenu((current) =>
+      current === slug ? null : slug,
+    );
+  }
+
+  function handleSearch(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    const value = searchQuery.trim();
+
+    if (!value) {
+      return;
+    }
+
+    setSearchOpen(false);
+
+    router.push(
+      `/productos?buscar=${encodeURIComponent(
+        value,
+      )}`,
+    );
+  }
+
+  function handleMobileSearch(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    const value =
+      mobileSearchQuery.trim();
+
+    if (!value) {
+      return;
+    }
+
+    setMobileOpen(false);
+
+    router.push(
+      `/productos?buscar=${encodeURIComponent(
+        value,
+      )}`,
+    );
+  }
+
+  return (
+    <>
+      <header className="sticky top-0 z-50 border-b border-purple-100 bg-white shadow-sm">
+        {/* BARRA SUPERIOR */}
+        <div className="bg-purple-950 px-4 py-1.5 text-center">
+          <div className="flex items-center justify-center gap-2 text-[11px] font-medium text-purple-100">
+            <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+
+            <span>
+              Detalles inolvidables para celebrar
+              momentos especiales
+            </span>
+
+            <span className="hidden font-bold text-amber-300 md:inline">
+              • Aurum Decoraciones
+            </span>
+          </div>
         </div>
 
-        <nav className="flex items-center gap-6 text-sm font-medium">
-          <Link href="/" className="hover:opacity-70">
-            Inicio
-          </Link>
+        {/* NAVBAR PRINCIPAL */}
+        <div className="relative z-[70] bg-white">
+          <div className="mx-auto flex h-[74px] max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
+            {/* LOGO */}
+            <Link
+              href="/"
+              className="flex shrink-0 items-center gap-3"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-950 text-amber-300 shadow-sm">
+                <Sparkles className="h-6 w-6" />
+              </div>
 
-          <Link href="/#categorias" className="hover:opacity-70">
-            Categorías
-          </Link>
+              <div>
+                <span className="block font-serif text-2xl font-black leading-none text-purple-950">
+                  Aurum
+                </span>
 
-          <Link href="/productos" className="hover:opacity-70">
-            Productos
-          </Link>
+                <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.22em] text-purple-600">
+                  Decoraciones
+                </span>
+              </div>
+            </Link>
 
-          <Link
-            href="/carrito"
-            className="font-semibold text-[#a2725e] hover:opacity-70"
-          >
-            Carrito ({totalItems})
-          </Link>
-
-          {user ? (
-            <>
-              {user.role === "CLIENTE" && (
-                <Link
-                  href="/pedidos"
-                  className="hover:opacity-70"
+            {/* BUSCADOR ESCRITORIO */}
+            <div className="relative z-[90] hidden flex-1 md:block">
+              <div className="mx-auto max-w-2xl">
+                <form
+                  onSubmit={handleSearch}
+                  className="relative"
                 >
-                  Mis pedidos
-                </Link>
-              )}
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-purple-500" />
 
-              <span className="font-semibold text-[#a2725e]">
-                Hola, {user.nombre}
-              </span>
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) =>
+                      setSearchQuery(
+                        event.target.value,
+                      )
+                    }
+                    placeholder="Buscar producto, regalo, ocasión..."
+                    onFocus={() => {
+                      setActiveCategoryMenu(null);
+                      setUserMenuOpen(false);
+                      setSearchOpen(true);
+                    }}
+                    onBlur={() =>
+                      window.setTimeout(
+                        () =>
+                          setSearchOpen(false),
+                        180,
+                      )
+                    }
+                    className="w-full rounded-full border border-purple-200 bg-[#fdfbfe] py-2.5 pl-11 pr-24 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:bg-white focus:ring-2 focus:ring-purple-100"
+                  />
 
+                  {searchQuery && (
+                    <button
+                      type="submit"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-purple-900 px-4 py-2 text-[11px] font-black text-white transition hover:bg-purple-800"
+                    >
+                      Buscar
+                    </button>
+                  )}
+
+                  <AnimatePresence>
+                    {searchOpen && (
+                      <motion.div
+                        initial={{
+                          opacity: 0,
+                          y: -5,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                        }}
+                        exit={{
+                          opacity: 0,
+                          y: -5,
+                        }}
+                        transition={{
+                          duration: 0.15,
+                        }}
+                        className="absolute left-0 right-0 top-[calc(100%+10px)] z-[100] rounded-2xl border border-purple-100 bg-white p-4 shadow-2xl"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Search className="h-3.5 w-3.5 text-purple-500" />
+
+                          <p className="text-[10px] font-black uppercase tracking-[0.1em] text-purple-950">
+                            Búsquedas populares
+                          </p>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {popularSearches.map(
+                            (item) => (
+                              <Link
+                                key={item.label}
+                                href={item.href}
+                                onClick={() => {
+                                  setSearchOpen(false);
+                                  setSearchQuery(
+                                    item.label,
+                                  );
+                                }}
+                                className="rounded-full border border-purple-100 bg-purple-50 px-3 py-1.5 text-[11px] font-bold text-purple-800 transition hover:border-purple-300 hover:bg-purple-100"
+                              >
+                                {item.label}
+                              </Link>
+                            ),
+                          )}
+                        </div>
+
+                        <p className="mt-3 text-[10px] leading-4 text-slate-400">
+                          Puedes buscar por nombre,
+                          categoría, ocasión o
+                          descripción.
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </form>
+              </div>
+            </div>
+
+            {/* ACCIONES */}
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              {/* ÚNICO CARRITO */}
               <button
                 type="button"
-                onClick={handleLogout}
-                className="font-semibold hover:opacity-70"
+                onClick={openCartDrawer}
+                className="relative flex h-10 w-10 items-center justify-center rounded-full border border-purple-100 bg-white text-purple-900 transition hover:border-purple-200 hover:bg-purple-50"
+                aria-label="Abrir carrito"
               >
-                Cerrar sesión
-              </button>
-            </>
-          ) : (
-            <>
-              <Link
-                href="/registro"
-                className="hover:opacity-70"
-              >
-                Crear cuenta
-              </Link>
+                <ShoppingBag className="h-5 w-5" />
 
-              <Link
-                href="/login"
-                className="font-semibold text-[#a2725e] hover:opacity-70"
+                {totalItems > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-black text-purple-950">
+                    {totalItems > 99
+                      ? "99+"
+                      : totalItems}
+                  </span>
+                )}
+              </button>
+
+              {/* USUARIO */}
+              <div
+                ref={userMenuRef}
+                className="relative hidden sm:block"
               >
-                Iniciar sesión
-              </Link>
-            </>
-          )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveCategoryMenu(null);
+                    setSearchOpen(false);
+
+                    setUserMenuOpen(
+                      (current) => !current,
+                    );
+                  }}
+                  className="flex items-center gap-2 rounded-2xl border border-purple-100 bg-white px-3 py-2 text-purple-950 shadow-sm transition hover:border-purple-200 hover:bg-purple-50"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-950 text-xs font-black uppercase text-amber-300">
+                    {user
+                      ? user.nombre
+                        .trim()
+                        .charAt(0)
+                        .toUpperCase()
+                      : "U"}
+                  </div>
+
+                  <div className="hidden text-left lg:block">
+                    <p className="max-w-[110px] truncate text-xs font-black leading-none text-purple-950">
+                      {user
+                        ? user.nombre.split(
+                          " ",
+                        )[0]
+                        : "Usuario"}
+                    </p>
+
+                    <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-purple-400">
+                      {user
+                        ? "Mi cuenta"
+                        : "Ingresar"}
+                    </p>
+                  </div>
+
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 text-purple-500 transition-transform ${
+                      userMenuOpen
+                        ? "rotate-180"
+                        : ""
+                      }`}
+                  />
+                </button>
+
+                <AnimatePresence>
+                  {userMenuOpen && (
+                    <motion.div
+                      initial={{
+                        opacity: 0,
+                        y: -5,
+                        scale: 0.98,
+                      }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                      }}
+                      exit={{
+                        opacity: 0,
+                        y: -5,
+                        scale: 0.98,
+                      }}
+                      transition={{
+                        duration: 0.15,
+                      }}
+                      className="absolute right-0 top-[calc(100%+10px)] z-[100] w-[250px] overflow-hidden rounded-2xl border border-purple-100 bg-white shadow-2xl shadow-purple-950/10"
+                    >
+                      {user ? (
+                        <>
+                          <div className="p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-purple-950 text-sm font-black uppercase text-amber-300">
+                                {user.nombre
+                                  .trim()
+                                  .charAt(0)
+                                  .toUpperCase()}
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-black text-purple-950">
+                                  {user.nombre}
+                                </p>
+
+                                <p className="mt-1 truncate text-[11px] text-slate-500">
+                                  {user.email}
+                                </p>
+
+                                <span className="mt-2 inline-flex rounded-full bg-purple-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-purple-700">
+                                  {user.role ===
+                                    "CLIENTE"
+                                    ? "Cliente"
+                                    : user.role}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="border-t border-purple-50">
+                            {user.role ===
+                              "CLIENTE" && (
+                                <Link
+                                  href="/pedidos"
+                                  onClick={() =>
+                                    setUserMenuOpen(
+                                      false,
+                                    )
+                                  }
+                                  className="flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 transition hover:bg-purple-50 hover:text-purple-950"
+                                >
+                                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-700">
+                                    <ShoppingBag className="h-4 w-4" />
+                                  </div>
+
+                                  <span>
+                                    Mis pedidos
+                                  </span>
+                                </Link>
+                              )}
+
+                            {user.role === "ADMIN" && (
+                              <Link
+                                href="/admin"
+                                onClick={() =>
+                                  setUserMenuOpen(false)
+                                }
+                                className="flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 transition hover:bg-purple-50 hover:text-purple-950"
+                              >
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-700">
+                                  <User className="h-4 w-4" />
+                                </div>
+
+                                <span>
+                                  Panel administrativo
+                                </span>
+                              </Link>
+                            )}
+                            <button
+                              type="button"
+                              onClick={handleLogout}
+                              className="flex w-full items-center gap-3 border-t border-purple-50 px-4 py-3 text-left text-xs font-bold text-red-600 transition hover:bg-red-50"
+                            >
+                              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-500">
+                                <X className="h-4 w-4" />
+                              </div>
+
+                              <span>
+                                Cerrar sesión
+                              </span>
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-950 text-amber-300">
+                                <User className="h-5 w-5" />
+                              </div>
+
+                              <div>
+                                <p className="text-sm font-black text-purple-950">
+                                  Mi cuenta
+                                </p>
+
+                                <p className="mt-1 text-[11px] text-slate-500">
+                                  Ingresa para continuar
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="border-t border-purple-50">
+                            <Link
+                              href="/login"
+                              onClick={() =>
+                                setUserMenuOpen(
+                                  false,
+                                )
+                              }
+                              className="block px-4 py-3 text-xs font-bold text-purple-950 transition hover:bg-purple-50"
+                            >
+                              Iniciar sesión
+                            </Link>
+
+                            <Link
+                              href="/registro"
+                              onClick={() =>
+                                setUserMenuOpen(
+                                  false,
+                                )
+                              }
+                              className="block border-t border-purple-50 px-4 py-3 text-xs font-bold text-purple-950 transition hover:bg-purple-50"
+                            >
+                              Crear cuenta
+                            </Link>
+                          </div>
+                        </>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* BOTÓN MÓVIL */}
+              <button
+                type="button"
+                onClick={() =>
+                  setMobileOpen(
+                    (current) => !current,
+                  )
+                }
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-purple-100 bg-white text-purple-900 sm:hidden"
+                aria-label="Abrir menú"
+              >
+                {mobileOpen ? (
+                  <X className="h-5 w-5" />
+                ) : (
+                  <Menu className="h-5 w-5" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* NAVEGACIÓN DE CATEGORÍAS */}
+        <nav className="relative z-40 hidden border-t border-purple-50 bg-white md:block">
+          <div
+            ref={categoryNavRef}
+            className="mx-auto flex h-[54px] max-w-7xl items-center justify-center gap-2 px-6"
+          >
+            <Link
+              href="/productos"
+              onClick={() =>
+                setActiveCategoryMenu(null)
+              }
+              className="rounded-full bg-purple-900 px-5 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-purple-800"
+            >
+              Todos los productos
+            </Link>
+
+            {categoryMenus.map(
+              (category) => {
+                const isOpen =
+                  activeCategoryMenu ===
+                  category.slug;
+
+                return (
+                  <div
+                    key={category.slug}
+                    className="relative"
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        toggleCategoryMenu(
+                          category.slug,
+                        )
+                      }
+                      className={`flex items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-bold transition ${
+                        isOpen
+                        ? "bg-purple-900 text-white"
+                        : "text-slate-700 hover:bg-purple-50 hover:text-purple-900"
+                        }`}
+                    >
+                      {category.label}
+
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 transition-transform ${
+                          isOpen
+                          ? "rotate-180"
+                          : ""
+                          }`}
+                      />
+                    </button>
+
+                    <AnimatePresence>
+                      {isOpen && (
+                        <motion.div
+                          initial={{
+                            opacity: 0,
+                            y: -5,
+                          }}
+                          animate={{
+                            opacity: 1,
+                            y: 0,
+                          }}
+                          exit={{
+                            opacity: 0,
+                            y: -5,
+                          }}
+                          transition={{
+                            duration: 0.15,
+                          }}
+                          className="absolute left-1/2 top-[calc(100%+9px)] z-[80] w-[420px] -translate-x-1/2 overflow-hidden rounded-2xl border border-purple-100 bg-white shadow-2xl"
+                        >
+                          <div className="flex items-center justify-between border-b border-purple-100 px-5 py-4">
+                            <div>
+                              <p className="text-[11px] font-black uppercase tracking-[0.08em] text-purple-950">
+                                {category.title}
+                              </p>
+
+                              <p className="mt-1 text-[10px] text-slate-400">
+                                Elige una ocasión
+                                especial
+                              </p>
+                            </div>
+
+                            <Sparkles className="h-4 w-4 text-amber-500" />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1 p-4">
+                            {category.occasions.map(
+                              (occasion) => {
+                                if (
+                                  !occasion.slug
+                                ) {
+                                  return (
+                                    <div
+                                      key={
+                                        occasion.label
+                                      }
+                                      title="Próximamente"
+                                      className="flex cursor-not-allowed items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-slate-400"
+                                    >
+                                      <Heart className="h-3.5 w-3.5 shrink-0 text-purple-200" />
+
+                                      <span>
+                                        {
+                                          occasion.label
+                                        }
+                                      </span>
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <Link
+                                    key={
+                                      occasion.label
+                                    }
+                                    href={`/productos?categoria=${category.slug}&ocasion=${occasion.slug}`}
+                                    onClick={() =>
+                                      setActiveCategoryMenu(
+                                        null,
+                                      )
+                                    }
+                                    className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-slate-700 transition hover:bg-purple-50 hover:text-purple-900"
+                                  >
+                                    <Heart className="h-3.5 w-3.5 shrink-0 text-purple-400" />
+
+                                    <span>
+                                      {
+                                        occasion.label
+                                      }
+                                    </span>
+                                  </Link>
+                                );
+                              },
+                            )}
+                          </div>
+
+                          <div className="border-t border-purple-50 bg-purple-50/50 p-3">
+                            <Link
+                              href={`/productos?categoria=${category.slug}`}
+                              onClick={() =>
+                                setActiveCategoryMenu(
+                                  null,
+                                )
+                              }
+                              className="flex items-center justify-center gap-2 rounded-xl bg-purple-900 px-4 py-2.5 text-xs font-black text-white transition hover:bg-purple-800"
+                            >
+                              <Gift className="h-4 w-4 text-amber-300" />
+
+                              Ver todos en{" "}
+                              {category.label}
+                            </Link>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              },
+            )}
+          </div>
         </nav>
-      </div>
-    </header>
+
+        {/* MENÚ MÓVIL */}
+        <AnimatePresence>
+          {mobileOpen && (
+            <motion.div
+              initial={{
+                height: 0,
+                opacity: 0,
+              }}
+              animate={{
+                height: "auto",
+                opacity: 1,
+              }}
+              exit={{
+                height: 0,
+                opacity: 0,
+              }}
+              transition={{
+                duration: 0.2,
+              }}
+              className="overflow-hidden border-t border-purple-100 bg-white sm:hidden"
+            >
+              <nav className="space-y-2 px-5 py-5">
+                <form
+                  onSubmit={
+                    handleMobileSearch
+                  }
+                  className="relative mb-4"
+                >
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-purple-500" />
+
+                  <input
+                    type="search"
+                    value={
+                      mobileSearchQuery
+                    }
+                    onChange={(event) =>
+                      setMobileSearchQuery(
+                        event.target.value,
+                      )
+                    }
+                    placeholder="Buscar productos..."
+                    className="w-full rounded-full border border-purple-200 bg-purple-50 py-3 pl-11 pr-20 text-sm text-slate-700 outline-none focus:border-purple-400 focus:bg-white"
+                  />
+
+                  {mobileSearchQuery && (
+                    <button
+                      type="submit"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-purple-900 px-3 py-2 text-[10px] font-black text-white"
+                    >
+                      Buscar
+                    </button>
+                  )}
+                </form>
+
+                <Link
+                  href="/productos"
+                  onClick={() =>
+                    setMobileOpen(false)
+                  }
+                  className="block rounded-xl bg-purple-900 px-4 py-3 text-sm font-bold text-white"
+                >
+                  Todos los productos
+                </Link>
+
+                {categoryMenus.map(
+                  (category) => (
+                    <Link
+                      key={category.slug}
+                      href={`/productos?categoria=${category.slug}`}
+                      onClick={() =>
+                        setMobileOpen(false)
+                      }
+                      className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-bold text-purple-950 transition hover:bg-purple-50"
+                    >
+                      {category.label}
+
+                      <ChevronDown className="h-4 w-4 -rotate-90 text-purple-400" />
+                    </Link>
+                  ),
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    openCartDrawer();
+                  }}
+                  className="block w-full rounded-xl px-4 py-3 text-left text-sm font-bold text-purple-950 hover:bg-purple-50"
+                >
+                  Carrito ({totalItems})
+                </button>
+
+                {user ? (
+                  <>
+                    <div className="rounded-xl bg-purple-50 px-4 py-3">
+                      <p className="text-xs font-black text-purple-950">
+                        {user.nombre}
+                      </p>
+
+                      <p className="mt-1 truncate text-[11px] text-slate-500">
+                        {user.email}
+                      </p>
+                    </div>
+
+                    {user.role ===
+                      "CLIENTE" && (
+                        <Link
+                          href="/pedidos"
+                          onClick={() =>
+                            setMobileOpen(
+                              false,
+                            )
+                          }
+                          className="block rounded-xl px-4 py-3 text-sm font-bold text-purple-950 hover:bg-purple-50"
+                        >
+                          Mis pedidos
+                        </Link>
+                      )}
+
+                    {user.role === "ADMIN" && (
+                      <Link
+                        href="/admin"
+                        onClick={() =>
+                          setMobileOpen(false)
+                        }
+                        className="block rounded-xl px-4 py-3 text-sm font-bold text-purple-950 hover:bg-purple-50"
+                      >
+                        Panel administrativo
+                      </Link>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="block w-full rounded-xl px-4 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50"
+                    >
+                      Cerrar sesión
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      href="/login"
+                      onClick={() =>
+                        setMobileOpen(false)
+                      }
+                      className="block rounded-xl px-4 py-3 text-sm font-bold text-purple-950 hover:bg-purple-50"
+                    >
+                      Iniciar sesión
+                    </Link>
+
+                    <Link
+                      href="/registro"
+                      onClick={() =>
+                        setMobileOpen(false)
+                      }
+                      className="block rounded-xl px-4 py-3 text-sm font-bold text-purple-950 hover:bg-purple-50"
+                    >
+                      Crear cuenta
+                    </Link>
+                  </>
+                )}
+              </nav>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
+
+      {/* DRAWER DEL ÚNICO CARRITO */}
+      <CartDrawer />
+
+      {/* NOTIFICACIÓN GLOBAL */}
+      <AnimatePresence>
+        {cartNotification && (
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: 25,
+              scale: 0.96,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              scale: 1,
+            }}
+            exit={{
+              opacity: 0,
+              y: 20,
+              scale: 0.96,
+            }}
+            className="fixed bottom-6 left-1/2 z-[200] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-2xl border border-emerald-200 bg-white p-4 shadow-2xl sm:left-6 sm:translate-x-0"
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                <Check className="h-5 w-5" />
+              </div>
+
+              <div>
+                <p className="font-black text-emerald-700">
+                  ¡Producto agregado!
+                </p>
+
+                <p className="mt-1 text-sm leading-5 text-slate-600">
+                  {cartNotification}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
