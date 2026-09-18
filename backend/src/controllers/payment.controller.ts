@@ -10,6 +10,7 @@ import {
   getWompiPseFinancialInstitutions,
   getWompiTransaction
 } from '../services/wompi.service.js';
+import { sendOrderConfirmationEmail } from '../services/mail.service.js';
 import { AppError } from '../utils/app-error.js';
 
 type WompiEventData = Record<string, unknown>;
@@ -189,6 +190,85 @@ function mapWompiStatusToPaymentStatus(
   return 'PENDIENTE';
 }
 
+async function sendPaymentConfirmationOnce(paymentId: string) {
+  const payment = await prisma.payment.findUnique({
+    where: {
+      id: paymentId
+    },
+    include: {
+      order: {
+        include: {
+          items: true
+        }
+      }
+    }
+  });
+
+  if (
+    !payment ||
+    payment.estado !== 'APROBADO' ||
+    payment.confirmacionEnviadaAt
+  ) {
+    return;
+  }
+
+  const confirmationDate = new Date();
+
+  const reserved = await prisma.payment.updateMany({
+    where: {
+      id: payment.id,
+      estado: 'APROBADO',
+      confirmacionEnviadaAt: null
+    },
+    data: {
+      confirmacionEnviadaAt: confirmationDate
+    }
+  });
+
+  if (reserved.count !== 1) {
+    return;
+  }
+
+  const order = payment.order;
+
+  try {
+    await sendOrderConfirmationEmail({
+      to: order.emailContacto,
+      nombre: order.nombreContacto,
+      numeroPedido: order.numeroPedido,
+      metodoEntrega: order.metodoEntrega,
+      direccionEntrega: order.direccionEntrega,
+      barrioEntrega: order.barrioEntrega,
+      ciudadEntrega: order.ciudadEntrega,
+      departamentoEntrega: order.departamentoEntrega,
+      subtotal: Number(order.subtotal),
+      costoEnvio: Number(order.costoEnvio),
+      descuento: Number(order.descuento),
+      total: Number(order.total),
+      items: order.items.map((item) => ({
+        nombreProducto: item.nombreProducto,
+        cantidad: item.cantidad,
+        precioUnitario: Number(item.precioUnitario)
+      }))
+    });
+  } catch (error) {
+    await prisma.payment.updateMany({
+      where: {
+        id: payment.id,
+        confirmacionEnviadaAt: confirmationDate
+      },
+      data: {
+        confirmacionEnviadaAt: null
+      }
+    });
+
+    console.error(
+      `No fue posible enviar la confirmacion del pago ${payment.id}.`,
+      error
+    );
+  }
+}
+
 async function syncWompiPayment(
   payment: {
     id: string;
@@ -269,6 +349,10 @@ async function syncWompiPayment(
       return updated;
     }
   );
+
+  if (updatedPayment.estado === 'APROBADO') {
+    await sendPaymentConfirmationOnce(updatedPayment.id);
+  }
 
   return {
     payment: updatedPayment,
@@ -472,6 +556,20 @@ export async function createWompiPayment(
     }
   });
 
+  if (payment.estado === 'APROBADO') {
+    await prisma.order.updateMany({
+      where: {
+        id: payment.orderId,
+        estado: 'PENDIENTE'
+      },
+      data: {
+        estado: 'EN_PREPARACION'
+      }
+    });
+
+    await sendPaymentConfirmationOnce(payment.id);
+  }
+
   const responseTransaction =
     data.metodo === 'PSE'
       ? (await waitForPseAsyncPaymentUrl(
@@ -580,6 +678,10 @@ export async function getWompiPaymentStatus(
     }
   );
 
+  if (updatedPayment.estado === 'APROBADO') {
+    await sendPaymentConfirmationOnce(updatedPayment.id);
+  }
+
   return res.status(200).json({
     message:
       'Estado de la transacción Wompi consultado correctamente.',
@@ -675,6 +777,10 @@ export async function handleWompiWebhook(
 
     return updated;
   });
+
+  if (updatedPayment.estado === 'APROBADO') {
+    await sendPaymentConfirmationOnce(updatedPayment.id);
+  }
 
   return res.status(200).json({
     message: 'Evento de Wompi procesado correctamente.',

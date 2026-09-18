@@ -36,9 +36,7 @@ type DeliveryMethod = "DOMICILIO" | "TIENDA";
 
 type PaymentMethod =
   | "NEQUI"
-  | "DAVIPLATA"
-  | "PSE"
-  | "TRANSFERENCIA_BANCARIA";
+  | "PSE";
 
 type MoneyValue = number | string;
 
@@ -264,6 +262,8 @@ export default function NewOrderForm() {
     useState("CC");
   const [pseDocumentNumber, setPseDocumentNumber] =
     useState("");
+  const [pseAccountType, setPseAccountType] = useState("AHORROS");
+  const [pseAccountNumber, setPseAccountNumber] = useState("");
 
   const [cantidad, setCantidad] = useState(1);
 
@@ -722,9 +722,21 @@ export default function NewOrderForm() {
     const institutionsData =
       data as WompiPseInstitutionsResponse;
 
-    setPseInstitutions(institutionsData.institutions);
+    const visibleInstitutions =
+      institutionsData.institutions
+        .filter((institution) =>
+          institution.financial_institution_name
+            .toLowerCase()
+            .includes("aprueba"),
+        )
+        .map((institution) => ({
+          ...institution,
+          financial_institution_name: "Bancolombia",
+        }));
 
-    return institutionsData.institutions;
+    setPseInstitutions(visibleInstitutions);
+
+    return visibleInstitutions;
   }
 
   async function createOrderAndContinue() {
@@ -962,6 +974,36 @@ export default function NewOrderForm() {
     return phone;
   }
 
+  async function syncNequiPaymentStatus(
+    transactionId: string,
+    token: string,
+  ) {
+    const response = await fetch(
+      `${apiUrl}/api/payments/wompi/${transactionId}/status`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    const data = (await response.json()) as WompiPaymentResponse;
+
+    if (response.status === 401) {
+      handleInvalidSession();
+      throw new Error("SESSION_INVALID");
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        data.message ||
+          "No fue posible consultar el estado del pago con Nequi.",
+      );
+    }
+
+    return data;
+  }
+
   async function handlePaymentMethodChange(
     method: PaymentMethod,
   ) {
@@ -1046,6 +1088,12 @@ export default function NewOrderForm() {
         );
         return;
       }
+      if (!pseAccountNumber.trim()) {
+        setError(
+          "Ingresa un número de cuenta para continuar con el pago por PSE.",
+        );
+        return;
+      }
     }
 
     if (!acceptTerms) {
@@ -1073,19 +1121,13 @@ export default function NewOrderForm() {
     try {
       setPaymentLoading(true);
 
-      let acceptanceData =
-        wompiAcceptance;
-
-      /*
-       * Si los términos no cargaron previamente,
-       * intentamos obtenerlos nuevamente.
+      /* Wompi permite usar cada token de aceptación una sola vez.
+       * Obtenemos tokens vigentes antes de cada nuevo intento de pago.
        */
-      if (!acceptanceData) {
-        acceptanceData =
-          await loadWompiAcceptanceData(
-            token,
-          );
-      }
+      const acceptanceData =
+        await loadWompiAcceptanceData(
+          token,
+        );
 
       const response = await fetch(
         `${apiUrl}/api/payments/wompi`,
@@ -1219,13 +1261,65 @@ export default function NewOrderForm() {
       }
 
       if (
+        paymentMethod === "NEQUI" &&
         paymentData.transaction.status === "PENDING"
       ) {
         if (isCartOrder) {
           clearCart();
         }
 
-        setPaymentMessage("");
+        setPaymentMessage(
+          "Esperando confirmación del pago en Nequi...",
+        );
+
+        let currentStatus: WompiTransactionStatus = "PENDING";
+
+        for (
+          let attempt = 0;
+          attempt < 10 && currentStatus === "PENDING";
+          attempt += 1
+        ) {
+          await new Promise<void>((resolve) => {
+            window.setTimeout(resolve, 3000);
+          });
+
+          const statusData = await syncNequiPaymentStatus(
+            paymentData.transaction.id,
+            token,
+          );
+
+          currentStatus = statusData.transaction.status;
+
+          setWompiTransaction({
+            id: statusData.transaction.id,
+            status: currentStatus,
+          });
+
+          if (currentStatus === "APPROVED") {
+            setPaymentMessage(
+              "El pago con Nequi fue aprobado correctamente.",
+            );
+            setError("");
+            setStep(4);
+            return;
+          }
+
+          if (
+            currentStatus === "DECLINED" ||
+            currentStatus === "VOIDED" ||
+            currentStatus === "ERROR"
+          ) {
+            setPaymentMessage("");
+            setError(
+              "Wompi no aprobó el pago con Nequi. Puedes intentarlo nuevamente.",
+            );
+            return;
+          }
+        }
+
+        setPaymentMessage(
+          "La solicitud sigue pendiente en Nequi. Puedes consultar el estado del pedido mientras Wompi termina de procesarla.",
+        );
         return;
       }
 
@@ -2381,10 +2475,8 @@ export default function NewOrderForm() {
                         enabled: true,
                       },
                       {
-                        value:
-                          "DAVIPLATA" as PaymentMethod,
-                        label:
-                          "Daviplata",
+                        value: "DAVIPLATA" as PaymentMethod,
+                        label: "Daviplata",
                         enabled: false,
                       },
                       {
@@ -2394,10 +2486,8 @@ export default function NewOrderForm() {
                         enabled: true,
                       },
                       {
-                        value:
-                          "TRANSFERENCIA_BANCARIA" as PaymentMethod,
-                        label:
-                          "Transferencia",
+                        value: "TRANSFERENCIA_BANCARIA" as PaymentMethod,
+                        label: "Transferencia",
                         enabled: false,
                       },
                     ].map(
@@ -2541,16 +2631,10 @@ export default function NewOrderForm() {
 
                             {pseInstitutions.map((institution) => (
                               <option
-                                key={
-                                  institution.financial_institution_code
-                                }
-                                value={
-                                  institution.financial_institution_code
-                                }
+                                key={institution.financial_institution_code}
+                                value={institution.financial_institution_code}
                               >
-                                {
-                                  institution.financial_institution_name
-                                }
+                                {institution.financial_institution_name}
                               </option>
                             ))}
                           </select>
@@ -2621,6 +2705,46 @@ export default function NewOrderForm() {
                             className={fieldClass}
                           />
                         </div>
+                      </div>
+                      <div>
+                        <label className={labelClass}>
+                          Tipo de cuenta
+                        </label>
+
+                        <select
+                          value={pseAccountType}
+                          onChange={(event) =>
+                            setPseAccountType(event.target.value)
+                          }
+                          className={fieldClass}
+                        >
+                          <option value="AHORROS">Cuenta de ahorros</option>
+                          <option value="CORRIENTE">Cuenta corriente</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>
+                          Número de cuenta
+                        </label>
+
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={pseAccountNumber}
+                          onChange={(event) =>
+                            setPseAccountNumber(
+                              event.target.value.replace(/\D/g, "").slice(0, 20),
+                            )
+                          }
+                          placeholder="Ej. 12345678901"
+                          className={fieldClass}
+                          autoComplete="off"
+                        />
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          Dato de demostración. AURUM no almacena ni envía este número a Wompi.
+                        </p>
                       </div>
                     </div>
                   )}
@@ -2770,6 +2894,21 @@ export default function NewOrderForm() {
                           Wompi notificará al
                           backend cuando el
                           estado cambie.
+                        </p>
+                      </div>
+                    )}
+                  {paymentMethod === "NEQUI" &&
+                    wompiTransaction &&
+                    (wompiTransaction.status === "DECLINED" ||
+                      wompiTransaction.status === "VOIDED" ||
+                      wompiTransaction.status === "ERROR") && (
+                      <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                        <p className="font-black">
+                          Pago con Nequi no aprobado
+                        </p>
+
+                        <p className="mt-1 leading-6">
+                          Wompi no aprobó la transacción. Puedes revisar tus datos e intentarlo nuevamente.
                         </p>
                       </div>
                     )}
