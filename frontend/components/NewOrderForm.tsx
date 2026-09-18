@@ -64,12 +64,6 @@ type WompiPseInstitution = {
   financial_institution_name: string;
 };
 
-const PSE_BANK_DISPLAY_NAMES: Record<string, string> = {
-  "1": "Bancolombia",
-  "2": "Davivienda",
-  "3": "Banco de Bogotá",
-};
-
 type WompiPseInstitutionsResponse = {
   institutions: WompiPseInstitution[];
 };
@@ -1086,19 +1080,13 @@ export default function NewOrderForm() {
     try {
       setPaymentLoading(true);
 
-      let acceptanceData =
-        wompiAcceptance;
-
-      /*
-       * Si los términos no cargaron previamente,
-       * intentamos obtenerlos nuevamente.
+      /* Wompi permite usar cada token de aceptación una sola vez.
+       * Obtenemos tokens vigentes antes de cada nuevo intento de pago.
        */
-      if (!acceptanceData) {
-        acceptanceData =
-          await loadWompiAcceptanceData(
-            token,
-          );
-      }
+      const acceptanceData =
+        await loadWompiAcceptanceData(
+          token,
+        );
 
       const response = await fetch(
         `${apiUrl}/api/payments/wompi`,
@@ -2550,18 +2538,10 @@ export default function NewOrderForm() {
 
                             {pseInstitutions.map((institution) => (
                               <option
-                                key={
-                                  institution.financial_institution_code
-                                }
-                                value={
-                                  institution.financial_institution_code
-                                }
+                                key={institution.financial_institution_code}
+                                value={institution.financial_institution_code}
                               >
-                                {
-                                  PSE_BANK_DISPLAY_NAMES[
-                                  institution.financial_institution_code
-                                  ] ?? institution.financial_institution_name
-                                }
+                                {institution.financial_institution_name}
                               </option>
                             ))}
                           </select>
