@@ -962,6 +962,36 @@ export default function NewOrderForm() {
     return phone;
   }
 
+  async function syncNequiPaymentStatus(
+    transactionId: string,
+    token: string,
+  ) {
+    const response = await fetch(
+      `${apiUrl}/api/payments/wompi/${transactionId}/status`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    const data = (await response.json()) as WompiPaymentResponse;
+
+    if (response.status === 401) {
+      handleInvalidSession();
+      throw new Error("SESSION_INVALID");
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        data.message ||
+          "No fue posible consultar el estado del pago con Nequi.",
+      );
+    }
+
+    return data;
+  }
+
   async function handlePaymentMethodChange(
     method: PaymentMethod,
   ) {
@@ -1046,13 +1076,12 @@ export default function NewOrderForm() {
         );
         return;
       }
-    }
-
-    if (!pseAccountNumber.trim()) {
-      setError(
-        "Ingresa un número de cuenta para continuar con el pago por PSE.",
-      );
-      return;
+      if (!pseAccountNumber.trim()) {
+        setError(
+          "Ingresa un número de cuenta para continuar con el pago por PSE.",
+        );
+        return;
+      }
     }
 
     if (!acceptTerms) {
@@ -1220,13 +1249,65 @@ export default function NewOrderForm() {
       }
 
       if (
+        paymentMethod === "NEQUI" &&
         paymentData.transaction.status === "PENDING"
       ) {
         if (isCartOrder) {
           clearCart();
         }
 
-        setPaymentMessage("");
+        setPaymentMessage(
+          "Esperando confirmación del pago en Nequi...",
+        );
+
+        let currentStatus: WompiTransactionStatus = "PENDING";
+
+        for (
+          let attempt = 0;
+          attempt < 10 && currentStatus === "PENDING";
+          attempt += 1
+        ) {
+          await new Promise<void>((resolve) => {
+            window.setTimeout(resolve, 3000);
+          });
+
+          const statusData = await syncNequiPaymentStatus(
+            paymentData.transaction.id,
+            token,
+          );
+
+          currentStatus = statusData.transaction.status;
+
+          setWompiTransaction({
+            id: statusData.transaction.id,
+            status: currentStatus,
+          });
+
+          if (currentStatus === "APPROVED") {
+            setPaymentMessage(
+              "El pago con Nequi fue aprobado correctamente.",
+            );
+            setError("");
+            setStep(4);
+            return;
+          }
+
+          if (
+            currentStatus === "DECLINED" ||
+            currentStatus === "VOIDED" ||
+            currentStatus === "ERROR"
+          ) {
+            setPaymentMessage("");
+            setError(
+              "Wompi no aprobó el pago con Nequi. Puedes intentarlo nuevamente.",
+            );
+            return;
+          }
+        }
+
+        setPaymentMessage(
+          "La solicitud sigue pendiente en Nequi. Puedes consultar el estado del pedido mientras Wompi termina de procesarla.",
+        );
         return;
       }
 
@@ -2801,6 +2882,21 @@ export default function NewOrderForm() {
                           Wompi notificará al
                           backend cuando el
                           estado cambie.
+                        </p>
+                      </div>
+                    )}
+                  {paymentMethod === "NEQUI" &&
+                    wompiTransaction &&
+                    (wompiTransaction.status === "DECLINED" ||
+                      wompiTransaction.status === "VOIDED" ||
+                      wompiTransaction.status === "ERROR") && (
+                      <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                        <p className="font-black">
+                          Pago con Nequi no aprobado
+                        </p>
+
+                        <p className="mt-1 leading-6">
+                          Wompi no aprobó la transacción. Puedes revisar tus datos e intentarlo nuevamente.
                         </p>
                       </div>
                     )}
