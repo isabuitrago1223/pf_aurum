@@ -75,17 +75,21 @@ export async function register(req: Request, res: Response) {
 
   const {
     password: rawPassword,
-    acceptedTerms: _terms,
-    acceptedPrivacy: _privacy,
+    acceptedTerms,
+    acceptedPrivacy,
     acceptedDataPolicy: _dataPolicy,
     ...userData
   } = data;
+
+  const acceptedAt = new Date();
 
   const user = await prisma.user.create({
     data: {
       ...userData,
       passwordHash: await bcrypt.hash(rawPassword, 12),
-      role: 'CLIENTE'
+      role: 'CLIENTE',
+      acceptedTermsAt: acceptedTerms ? acceptedAt : null,
+      acceptedPrivacyAt: acceptedPrivacy ? acceptedAt : null
     }
   });
 
@@ -138,18 +142,27 @@ export async function login(req: Request, res: Response) {
     );
   }
 
+  const updatedUser = await prisma.user.update({
+    where: {
+      id: user.id
+    },
+    data: {
+      lastLoginAt: new Date()
+    }
+  });
+
   const token = signAccessToken({
-    sub: user.id,
-    role: user.role
+    sub: updatedUser.id,
+    role: updatedUser.role
   });
 
   res.json({
     token,
     user: {
-      id: user.id,
-      nombre: user.nombre,
-      email: user.email,
-      role: user.role
+      id: updatedUser.id,
+      nombre: updatedUser.nombre,
+      email: updatedUser.email,
+      role: updatedUser.role
     }
   });
 }
