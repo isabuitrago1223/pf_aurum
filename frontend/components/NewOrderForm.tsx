@@ -722,9 +722,21 @@ export default function NewOrderForm() {
     const institutionsData =
       data as WompiPseInstitutionsResponse;
 
-    setPseInstitutions(institutionsData.institutions);
+    const visibleInstitutions =
+      institutionsData.institutions
+        .filter((institution) =>
+          institution.financial_institution_name
+            .toLowerCase()
+            .includes("aprueba"),
+        )
+        .map((institution) => ({
+          ...institution,
+          financial_institution_name: "Bancolombia",
+        }));
 
-    return institutionsData.institutions;
+    setPseInstitutions(visibleInstitutions);
+
+    return visibleInstitutions;
   }
 
   async function createOrderAndContinue() {
