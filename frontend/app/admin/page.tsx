@@ -219,14 +219,11 @@ export default function AdminDashboardPage() {
                 return;
             }
 
-            const data: DashboardResponse =
-                await response.json();
+            const data: DashboardResponse = await response.json();
 
             setDashboard(data);
         } catch {
-            setError(
-                "No fue posible conectar con el servidor.",
-            );
+            setError("No fue posible conectar con el servidor.");
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -332,8 +329,9 @@ export default function AdminDashboardPage() {
                         className="flex w-fit items-center gap-2 rounded-xl border border-purple-200 bg-white px-4 py-2.5 text-sm font-bold text-purple-800 transition hover:bg-purple-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <RefreshCw
-                            className={`h-4 w-4 ${refreshing ? "animate-spin" : ""
-                                }`}
+                            className={`h-4 w-4 ${
+                                refreshing ? "animate-spin" : ""
+                            }`}
                         />
                         {refreshing ? "Actualizando..." : "Actualizar"}
                     </button>
@@ -509,17 +507,22 @@ export default function AdminDashboardPage() {
                                                                 order.estado,
                                                             )}`}
                                                         >
-                                                            {getStatusLabel(order.estado)}
+                                                            {getStatusLabel(
+                                                                order.estado,
+                                                            )}
                                                         </span>
                                                     </div>
 
                                                     <p className="mt-1 truncate text-sm text-slate-600">
-                                                        {order.user.nombre} {order.user.apellido}
+                                                        {order.user.nombre}{" "}
+                                                        {order.user.apellido}
                                                     </p>
 
                                                     <p className="mt-1 flex items-center gap-1 text-xs text-slate-400">
                                                         <Clock3 className="h-3.5 w-3.5" />
-                                                        {formatDate(order.createdAt)}
+                                                        {formatDate(
+                                                            order.createdAt,
+                                                        )}
                                                     </p>
                                                 </div>
 
@@ -529,11 +532,13 @@ export default function AdminDashboardPage() {
                                                     </p>
 
                                                     <p className="mt-1 text-xs font-semibold text-slate-400">
-                                                        {order.metodoEntrega === "DOMICILIO"
+                                                        {order.metodoEntrega ===
+                                                        "DOMICILIO"
                                                             ? "Domicilio"
-                                                            : order.metodoEntrega === "TIENDA"
-                                                                ? "Recogida en tienda"
-                                                                : order.metodoEntrega}
+                                                            : order.metodoEntrega ===
+                                                                "TIENDA"
+                                                              ? "Recogida en tienda"
+                                                              : order.metodoEntrega}
                                                     </p>
                                                 </div>
                                             </div>
@@ -553,13 +558,14 @@ export default function AdminDashboardPage() {
                                     </div>
 
                                     <p className="mt-1 text-xs text-slate-500">
-                                        Productos activos en su nivel mínimo o por debajo.
+                                        Productos activos en su nivel mínimo o por
+                                        debajo.
                                     </p>
                                 </div>
 
                                 <div className="divide-y divide-slate-100">
                                     {dashboard.alertas.productosStockBajo.length ===
-                                        0 ? (
+                                    0 ? (
                                         <div className="p-6 text-center">
                                             <PackageCheck className="mx-auto h-8 w-8 text-emerald-600" />
 
@@ -590,7 +596,8 @@ export default function AdminDashboardPage() {
                                                         </p>
 
                                                         <p className="text-[10px] font-semibold text-slate-400">
-                                                            mínimo {product.stockMinimo}
+                                                            mínimo{" "}
+                                                            {product.stockMinimo}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -649,21 +656,90 @@ export default function AdminDashboardPage() {
                             </Link>
                         </section>
 
-                        <section className="mt-6 rounded-2xl border border-purple-100 bg-purple-50 p-5">
-                            <div className="flex items-start gap-3">
-                                <PackageOpen className="mt-0.5 h-5 w-5 shrink-0 text-purple-700" />
+                        <section className="mt-8">
+                            <div className="mb-4">
+                                <h2 className="text-lg font-black text-purple-950">
+                                    Gestión de catálogo
+                                </h2>
 
-                                <div>
-                                    <p className="text-sm font-black text-purple-950">
-                                        Gestión de catálogo
-                                    </p>
+                                <p className="mt-1 text-sm text-slate-500">
+                                    Administra los productos, categorías y ocasiones
+                                    de AURUM.
+                                </p>
+                            </div>
 
-                                    <p className="mt-1 text-xs leading-5 text-purple-700">
-                                        El mantenimiento administrativo de productos,
-                                        categorías, ocasiones e imágenes se mantiene fuera
-                                        de este bloque para evitar mezclar responsabilidades.
-                                    </p>
-                                </div>
+                            <div className="grid gap-4 md:grid-cols-3">
+                                <Link
+                                    href="/admin/productos"
+                                    className="group flex items-center justify-between rounded-2xl border border-purple-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-purple-300 hover:shadow-md"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-800">
+                                            <Boxes className="h-6 w-6" />
+                                        </div>
+
+                                        <div>
+                                            <p className="font-black text-purple-950">
+                                                Administrar productos
+                                            </p>
+
+                                            <p className="mt-1 text-xs leading-5 text-slate-500">
+                                                Crear, editar y gestionar los
+                                                productos del catálogo.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <ArrowRight className="h-5 w-5 shrink-0 text-purple-400 transition group-hover:translate-x-1" />
+                                </Link>
+
+                                <Link
+                                    href="/admin/categorias"
+                                    className="group flex items-center justify-between rounded-2xl border border-purple-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-purple-300 hover:shadow-md"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                                            <PackageOpen className="h-6 w-6" />
+                                        </div>
+
+                                        <div>
+                                            <p className="font-black text-purple-950">
+                                                Administrar categorías
+                                            </p>
+
+                                            <p className="mt-1 text-xs leading-5 text-slate-500">
+                                                Organizar y mantener las categorías
+                                                del catálogo.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <ArrowRight className="h-5 w-5 shrink-0 text-purple-400 transition group-hover:translate-x-1" />
+                                </Link>
+
+                                <Link
+                                    href="/admin/ocasiones"
+                                    className="group flex items-center justify-between rounded-2xl border border-purple-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-purple-300 hover:shadow-md"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-700">
+                                            <Sparkles className="h-6 w-6" />
+                                        </div>
+
+                                        <div>
+                                            <p className="font-black text-purple-950">
+                                                Administrar ocasiones
+                                            </p>
+
+                                            <p className="mt-1 text-xs leading-5 text-slate-500">
+                                                Gestionar las ocasiones disponibles
+                                                para los productos.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <ArrowRight className="h-5 w-5 shrink-0 text-purple-400 transition group-hover:translate-x-1" />
+                                </Link>
                             </div>
                         </section>
                     </>
