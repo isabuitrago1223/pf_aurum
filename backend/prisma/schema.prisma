@@ -241,6 +241,7 @@ model Payment {
   proveedorTransaccion  String?       @db.VarChar(120)
   respuestaPasarela     Json?
   pagadoAt              DateTime?
+  confirmacionEnviadaAt DateTime?
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
 

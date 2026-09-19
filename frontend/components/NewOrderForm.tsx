@@ -36,9 +36,7 @@ type DeliveryMethod = "DOMICILIO" | "TIENDA";
 
 type PaymentMethod =
   | "NEQUI"
-  | "DAVIPLATA"
-  | "PSE"
-  | "TRANSFERENCIA_BANCARIA";
+  | "PSE";
 
 type MoneyValue = number | string;
 
@@ -61,6 +59,15 @@ type WompiAcceptanceResponse = {
   personalDataAuthPermalink: string;
 };
 
+type WompiPseInstitution = {
+  financial_institution_code: string;
+  financial_institution_name: string;
+};
+
+type WompiPseInstitutionsResponse = {
+  institutions: WompiPseInstitution[];
+};
+
 type WompiTransactionStatus =
   | "PENDING"
   | "APPROVED"
@@ -75,10 +82,10 @@ type WompiPaymentResponse = {
     orderId: string;
     metodo: PaymentMethod;
     estado:
-      | "PENDIENTE"
-      | "APROBADO"
-      | "RECHAZADO"
-      | "REEMBOLSADO";
+    | "PENDIENTE"
+    | "APROBADO"
+    | "RECHAZADO"
+    | "REEMBOLSADO";
     monto: string;
     referencia: string | null;
     proveedorTransaccion: string | null;
@@ -89,6 +96,12 @@ type WompiPaymentResponse = {
     status: WompiTransactionStatus;
     amount_in_cents: number;
     currency: string;
+    payment_method?: {
+      type?: string;
+      extra?: {
+        async_payment_url?: string;
+      };
+    };
   };
 };
 
@@ -240,6 +253,18 @@ export default function NewOrderForm() {
   const [paymentMethod, setPaymentMethod] =
     useState<PaymentMethod>("NEQUI");
 
+  const [pseInstitutions, setPseInstitutions] =
+    useState<WompiPseInstitution[]>([]);
+  const [pseInstitutionCode, setPseInstitutionCode] =
+    useState("");
+  const [pseUserType, setPseUserType] = useState("0");
+  const [pseDocumentType, setPseDocumentType] =
+    useState("CC");
+  const [pseDocumentNumber, setPseDocumentNumber] =
+    useState("");
+  const [pseAccountType, setPseAccountType] = useState("AHORROS");
+  const [pseAccountNumber, setPseAccountNumber] = useState("");
+
   const [cantidad, setCantidad] = useState(1);
 
   const [loading, setLoading] = useState(false);
@@ -307,7 +332,7 @@ export default function NewOrderForm() {
   const estimatedOrderTotal =
     cartTotal +
     (metodoEntrega === "DOMICILIO" &&
-    deliveryEstimate.amount
+      deliveryEstimate.amount
       ? deliveryEstimate.amount
       : 0);
 
@@ -637,8 +662,8 @@ export default function NewOrderForm() {
       if (!response.ok) {
         const message =
           data &&
-          "message" in data &&
-          typeof data.message === "string"
+            "message" in data &&
+            typeof data.message === "string"
             ? data.message
             : "No fue posible obtener los términos de Wompi.";
 
@@ -655,6 +680,63 @@ export default function NewOrderForm() {
     } finally {
       setAcceptanceLoading(false);
     }
+  }
+
+  async function loadPseInstitutions(token: string) {
+    const response = await fetch(
+      `${apiUrl}/api/payments/wompi/pse/institutions`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    const data = (await response
+      .json()
+      .catch(() => null)) as
+      | WompiPseInstitutionsResponse
+      | ApiErrorResponse
+      | null;
+
+    if (
+      response.status === 401 ||
+      response.status === 403
+    ) {
+      handleInvalidSession();
+      throw new Error("SESSION_INVALID");
+    }
+
+    if (!response.ok) {
+      const message =
+        data &&
+          "message" in data &&
+          typeof data.message === "string"
+          ? data.message
+          : "No fue posible obtener las instituciones PSE.";
+
+      throw new Error(message);
+    }
+
+    const institutionsData =
+      data as WompiPseInstitutionsResponse;
+
+    const visibleInstitutions =
+      institutionsData.institutions
+        .filter((institution) =>
+          institution.financial_institution_name
+            .toLowerCase()
+            .includes("aprueba"),
+        )
+        .map((institution) => ({
+          ...institution,
+          financial_institution_name: "Bancolombia",
+        }));
+
+    setPseInstitutions(visibleInstitutions);
+
+    return visibleInstitutions;
   }
 
   async function createOrderAndContinue() {
@@ -754,7 +836,7 @@ export default function NewOrderForm() {
       notasEntrega:
         [
           metodoEntrega === "DOMICILIO" &&
-          contactData.horaEntrega.trim()
+            contactData.horaEntrega.trim()
             ? `Hora de entrega: ${contactData.horaEntrega.trim()}`
             : "",
           contactData.notasEntrega.trim(),
@@ -807,7 +889,7 @@ export default function NewOrderForm() {
 
         setError(
           data?.message ??
-            "No hay suficiente stock para completar el pedido.",
+          "No hay suficiente stock para completar el pedido.",
         );
         return;
       }
@@ -821,7 +903,7 @@ export default function NewOrderForm() {
 
         setError(
           data?.message ??
-            "No fue posible crear el pedido. Revisa los datos e intenta nuevamente.",
+          "No fue posible crear el pedido. Revisa los datos e intenta nuevamente.",
         );
         return;
       }
@@ -892,6 +974,72 @@ export default function NewOrderForm() {
     return phone;
   }
 
+  async function syncNequiPaymentStatus(
+    transactionId: string,
+    token: string,
+  ) {
+    const response = await fetch(
+      `${apiUrl}/api/payments/wompi/${transactionId}/status`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    const data = (await response.json()) as WompiPaymentResponse;
+
+    if (response.status === 401) {
+      handleInvalidSession();
+      throw new Error("SESSION_INVALID");
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        data.message ||
+          "No fue posible consultar el estado del pago con Nequi.",
+      );
+    }
+
+    return data;
+  }
+
+  async function handlePaymentMethodChange(
+    method: PaymentMethod,
+  ) {
+    setPaymentMethod(method);
+    setError("");
+    setPaymentMessage("");
+
+    if (method !== "PSE" || pseInstitutions.length > 0) {
+      return;
+    }
+
+    const token = localStorage.getItem("aurum_token");
+
+    if (!token) {
+      handleInvalidSession();
+      return;
+    }
+
+    try {
+      await loadPseInstitutions(token);
+    } catch (pseError) {
+      if (
+        pseError instanceof Error &&
+        pseError.message === "SESSION_INVALID"
+      ) {
+        return;
+      }
+
+      setError(
+        pseError instanceof Error
+          ? pseError.message
+          : "No fue posible cargar las instituciones PSE.",
+      );
+    }
+  }
+
   async function payWithWompi() {
     setError("");
     setPaymentMessage("");
@@ -903,9 +1051,12 @@ export default function NewOrderForm() {
       return;
     }
 
-    if (paymentMethod !== "NEQUI") {
+    if (
+      paymentMethod !== "NEQUI" &&
+      paymentMethod !== "PSE"
+    ) {
       setError(
-        "Por ahora el pago habilitado con Wompi es Nequi.",
+        "Selecciona un método de pago habilitado.",
       );
       return;
     }
@@ -913,11 +1064,36 @@ export default function NewOrderForm() {
     const phoneNumber =
       getNequiPhoneNumber();
 
-    if (!/^\d{10}$/.test(phoneNumber)) {
+    if (
+      paymentMethod === "NEQUI" &&
+      !/^\d{10}$/.test(phoneNumber)
+    ) {
       setError(
         "Para pagar con Nequi debes ingresar un celular colombiano de 10 dígitos.",
       );
       return;
+    }
+
+    if (paymentMethod === "PSE") {
+      if (!pseInstitutionCode) {
+        setError(
+          "Selecciona una entidad financiera para pagar con PSE.",
+        );
+        return;
+      }
+
+      if (!pseDocumentNumber.trim()) {
+        setError(
+          "Ingresa el número de documento para pagar con PSE.",
+        );
+        return;
+      }
+      if (!pseAccountNumber.trim()) {
+        setError(
+          "Ingresa un número de cuenta para continuar con el pago por PSE.",
+        );
+        return;
+      }
     }
 
     if (!acceptTerms) {
@@ -945,19 +1121,13 @@ export default function NewOrderForm() {
     try {
       setPaymentLoading(true);
 
-      let acceptanceData =
-        wompiAcceptance;
-
-      /*
-       * Si los términos no cargaron previamente,
-       * intentamos obtenerlos nuevamente.
+      /* Wompi permite usar cada token de aceptación una sola vez.
+       * Obtenemos tokens vigentes antes de cada nuevo intento de pago.
        */
-      if (!acceptanceData) {
-        acceptanceData =
-          await loadWompiAcceptanceData(
-            token,
-          );
-      }
+      const acceptanceData =
+        await loadWompiAcceptanceData(
+          token,
+        );
 
       const response = await fetch(
         `${apiUrl}/api/payments/wompi`,
@@ -970,15 +1140,29 @@ export default function NewOrderForm() {
           },
           body: JSON.stringify({
             orderId: createdOrder.id,
-            metodo: "NEQUI",
+            metodo: paymentMethod,
             acceptanceToken:
               acceptanceData.acceptanceToken,
             acceptPersonalAuth:
               acceptanceData.personalDataAuthToken,
-            paymentMethod: {
-              type: "NEQUI",
-              phone_number: phoneNumber,
-            },
+            paymentMethod:
+              paymentMethod === "NEQUI"
+                ? {
+                  type: "NEQUI",
+                  phone_number: phoneNumber,
+                }
+                : {
+                  type: "PSE",
+                  user_type: Number(pseUserType),
+                  user_legal_id_type:
+                    pseDocumentType,
+                  user_legal_id:
+                    pseDocumentNumber.trim(),
+                  financial_institution_code:
+                    pseInstitutionCode,
+                  payment_description:
+                    "Pago pedido Aurum",
+                },
           }),
         },
       );
@@ -1001,8 +1185,8 @@ export default function NewOrderForm() {
       if (response.status === 409) {
         const message =
           data &&
-          "message" in data &&
-          typeof data.message === "string"
+            "message" in data &&
+            typeof data.message === "string"
             ? data.message
             : "Ya existe un pago pendiente o aprobado para este pedido.";
 
@@ -1013,8 +1197,8 @@ export default function NewOrderForm() {
       if (!response.ok) {
         const message =
           data &&
-          "message" in data &&
-          typeof data.message === "string"
+            "message" in data &&
+            typeof data.message === "string"
             ? data.message
             : "No fue posible iniciar el pago con Wompi.";
 
@@ -1032,8 +1216,8 @@ export default function NewOrderForm() {
       });
 
       if (
-        paymentData.transaction.status ===
-        "APPROVED"
+        paymentMethod !== "PSE" &&
+        paymentData.transaction.status === "APPROVED"
       ) {
         if (isCartOrder) {
           clearCart();
@@ -1048,24 +1232,104 @@ export default function NewOrderForm() {
       }
 
       if (
-        paymentData.transaction.status ===
-        "PENDING"
+        paymentMethod === "PSE" &&
+        (paymentData.transaction.status === "PENDING" ||
+          paymentData.transaction.status === "APPROVED")
+      ) {
+        const asyncPaymentUrl =
+          paymentData.transaction.payment_method?.extra
+            ?.async_payment_url;
+
+        if (!asyncPaymentUrl) {
+          setError(
+            "Wompi inició la transacción PSE, pero no devolvió la URL para continuar el pago.",
+          );
+          return;
+        }
+
+        if (isCartOrder) {
+          clearCart();
+        }
+
+        sessionStorage.setItem(
+          "aurum_wompi_transaction_id",
+          paymentData.transaction.id,
+        );
+
+        window.location.href = asyncPaymentUrl;
+        return;
+      }
+
+      if (
+        paymentMethod === "NEQUI" &&
+        paymentData.transaction.status === "PENDING"
       ) {
         if (isCartOrder) {
           clearCart();
         }
 
-        setPaymentMessage("");
+        setPaymentMessage(
+          "Esperando confirmación del pago en Nequi...",
+        );
+
+        let currentStatus: WompiTransactionStatus = "PENDING";
+
+        for (
+          let attempt = 0;
+          attempt < 10 && currentStatus === "PENDING";
+          attempt += 1
+        ) {
+          await new Promise<void>((resolve) => {
+            window.setTimeout(resolve, 3000);
+          });
+
+          const statusData = await syncNequiPaymentStatus(
+            paymentData.transaction.id,
+            token,
+          );
+
+          currentStatus = statusData.transaction.status;
+
+          setWompiTransaction({
+            id: statusData.transaction.id,
+            status: currentStatus,
+          });
+
+          if (currentStatus === "APPROVED") {
+            setPaymentMessage(
+              "El pago con Nequi fue aprobado correctamente.",
+            );
+            setError("");
+            setStep(4);
+            return;
+          }
+
+          if (
+            currentStatus === "DECLINED" ||
+            currentStatus === "VOIDED" ||
+            currentStatus === "ERROR"
+          ) {
+            setPaymentMessage("");
+            setError(
+              "Wompi no aprobó el pago con Nequi. Puedes intentarlo nuevamente.",
+            );
+            return;
+          }
+        }
+
+        setPaymentMessage(
+          "La solicitud sigue pendiente en Nequi. Puedes consultar el estado del pedido mientras Wompi termina de procesarla.",
+        );
         return;
       }
 
       if (
         paymentData.transaction.status ===
-          "DECLINED" ||
+        "DECLINED" ||
         paymentData.transaction.status ===
-          "VOIDED" ||
+        "VOIDED" ||
         paymentData.transaction.status ===
-          "ERROR"
+        "ERROR"
       ) {
         setError(
           "Wompi no aprobó la transacción. Puedes revisar los datos e intentar nuevamente.",
@@ -1216,13 +1480,12 @@ export default function NewOrderForm() {
                   className="relative z-10 flex w-20 flex-col items-center text-center sm:w-32"
                 >
                   <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-full border-4 border-white text-sm font-black shadow-md transition ${
-                      completed
-                        ? "bg-emerald-600 text-white"
-                        : active
-                          ? "bg-purple-700 text-white"
-                          : "bg-slate-200 text-slate-500"
-                    }`}
+                    className={`flex h-10 w-10 items-center justify-center rounded-full border-4 border-white text-sm font-black shadow-md transition ${completed
+                      ? "bg-emerald-600 text-white"
+                      : active
+                        ? "bg-purple-700 text-white"
+                        : "bg-slate-200 text-slate-500"
+                      }`}
                   >
                     {completed ? (
                       <Check
@@ -1235,13 +1498,12 @@ export default function NewOrderForm() {
                   </div>
 
                   <span
-                    className={`mt-2 hidden text-[11px] font-bold sm:block ${
-                      completed
-                        ? "text-emerald-700"
-                        : active
-                          ? "text-purple-800"
-                          : "text-slate-400"
-                    }`}
+                    className={`mt-2 hidden text-[11px] font-bold sm:block ${completed
+                      ? "text-emerald-700"
+                      : active
+                        ? "text-purple-800"
+                        : "text-slate-400"
+                      }`}
                   >
                     {item.label}
                   </span>
@@ -1350,11 +1612,10 @@ export default function NewOrderForm() {
                           )
                         }
                         placeholder="Tu nombre"
-                        className={`${fieldClass} ${
-                          fieldErrors.nombre
-                            ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-                            : ""
-                        }`}
+                        className={`${fieldClass} ${fieldErrors.nombre
+                          ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                          : ""
+                          }`}
                       />
                     </div>
 
@@ -1402,11 +1663,10 @@ export default function NewOrderForm() {
                           )
                         }
                         placeholder="Tu apellido"
-                        className={`${fieldClass} ${
-                          fieldErrors.apellido
-                            ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-                            : ""
-                        }`}
+                        className={`${fieldClass} ${fieldErrors.apellido
+                          ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                          : ""
+                          }`}
                       />
                     </div>
 
@@ -1456,11 +1716,10 @@ export default function NewOrderForm() {
                         }
                         placeholder="Número de cédula"
                         maxLength={15}
-                        className={`${fieldClass} ${
-                          fieldErrors.cedulaContacto
-                            ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-                            : ""
-                        }`}
+                        className={`${fieldClass} ${fieldErrors.cedulaContacto
+                          ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                          : ""
+                          }`}
                       />
                     </div>
 
@@ -1508,11 +1767,10 @@ export default function NewOrderForm() {
                           )
                         }
                         placeholder="3001234567"
-                        className={`${fieldClass} ${
-                          fieldErrors.telefonoContacto
-                            ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-                            : ""
-                        }`}
+                        className={`${fieldClass} ${fieldErrors.telefonoContacto
+                          ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                          : ""
+                          }`}
                       />
                     </div>
 
@@ -1554,11 +1812,10 @@ export default function NewOrderForm() {
                         )
                       }
                       placeholder="correo@ejemplo.com"
-                      className={`${fieldClass} ${
-                        fieldErrors.emailContacto
-                          ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-                          : ""
-                      }`}
+                      className={`${fieldClass} ${fieldErrors.emailContacto
+                        ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                        : ""
+                        }`}
                     />
                   </div>
 
@@ -1606,11 +1863,10 @@ export default function NewOrderForm() {
                             ),
                           )
                         }
-                        className={`${fieldClass} ${
-                          fieldErrors.cantidad
-                            ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-                            : ""
-                        }`}
+                        className={`${fieldClass} ${fieldErrors.cantidad
+                          ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                          : ""
+                          }`}
                       />
                     </div>
 
@@ -1672,12 +1928,11 @@ export default function NewOrderForm() {
                       );
                       setError("");
                     }}
-                    className={`rounded-2xl border-2 p-5 text-left transition ${
-                      metodoEntrega ===
+                    className={`rounded-2xl border-2 p-5 text-left transition ${metodoEntrega ===
                       "DOMICILIO"
-                        ? "border-purple-600 bg-purple-50 shadow-sm"
-                        : "border-purple-100 bg-white hover:border-purple-300"
-                    }`}
+                      ? "border-purple-600 bg-purple-50 shadow-sm"
+                      : "border-purple-100 bg-white hover:border-purple-300"
+                      }`}
                   >
                     <div className="flex items-start gap-4">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-700 text-white">
@@ -1707,12 +1962,11 @@ export default function NewOrderForm() {
                       );
                       setError("");
                     }}
-                    className={`rounded-2xl border-2 p-5 text-left transition ${
-                      metodoEntrega ===
+                    className={`rounded-2xl border-2 p-5 text-left transition ${metodoEntrega ===
                       "TIENDA"
-                        ? "border-purple-600 bg-purple-50 shadow-sm"
-                        : "border-purple-100 bg-white hover:border-purple-300"
-                    }`}
+                      ? "border-purple-600 bg-purple-50 shadow-sm"
+                      : "border-purple-100 bg-white hover:border-purple-300"
+                      }`}
                   >
                     <div className="flex items-start gap-4">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-700 text-white">
@@ -1736,236 +1990,289 @@ export default function NewOrderForm() {
 
                 {metodoEntrega ===
                   "DOMICILIO" && (
-                  <div className="mt-6 rounded-2xl border border-purple-100 bg-purple-50/40 p-5">
-                    <div className="mb-5 flex items-center gap-2 text-purple-800">
-                      <MapPin size={19} />
+                    <div className="mt-6 rounded-2xl border border-purple-100 bg-purple-50/40 p-5">
+                      <div className="mb-5 flex items-center gap-2 text-purple-800">
+                        <MapPin size={19} />
 
-                      <h3 className="font-black">
-                        Datos de entrega
-                      </h3>
-                    </div>
-
-                    <div>
-                      <label
-                        className={
-                          labelClass
-                        }
-                      >
-                        Dirección de
-                        entrega{" "}
-                        <span className="text-red-500">
-                          *
-                        </span>
-                      </label>
-
-                      <div className="relative">
-                        <MapPin
-                          size={21}
-                          className={
-                            iconClass
-                          }
-                        />
-
-                        <input
-                          id="direccionEntrega"
-                          type="text"
-                          aria-invalid={Boolean(fieldErrors.direccionEntrega)}
-                          value={
-                            contactData.direccionEntrega
-                          }
-                          onChange={(
-                            event,
-                          ) =>
-                            updateField(
-                              "direccionEntrega",
-                              event.target
-                                .value,
-                            )
-                          }
-                          placeholder="Ej: Carrera 15 #85-30"
-                          className={`${fieldClass} ${
-                            fieldErrors.direccionEntrega
-                              ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-                              : ""
-                          }`}
-                        />
+                        <h3 className="font-black">
+                          Datos de entrega
+                        </h3>
                       </div>
 
-                      {fieldErrors.direccionEntrega && (
-                        <p className="mt-1.5 text-xs font-semibold text-red-600">
-                          {fieldErrors.direccionEntrega}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="mt-5 grid gap-5 md:grid-cols-3">
-                      {/* DEPARTAMENTO */}
                       <div>
-                        <label className={labelClass}>
-                          Departamento{" "}
-                          <span className="text-red-500">*</span>
+                        <label
+                          className={
+                            labelClass
+                          }
+                        >
+                          Dirección de
+                          entrega{" "}
+                          <span className="text-red-500">
+                            *
+                          </span>
                         </label>
 
                         <div className="relative">
                           <MapPin
-                            size={20}
-                            className={iconClass}
+                            size={21}
+                            className={
+                              iconClass
+                            }
                           />
 
-                          <select
-                            id="departamentoEntrega"
-                            aria-invalid={Boolean(fieldErrors.departamentoEntrega)}
-                            value={contactData.departamentoEntrega}
-                            onChange={(event) => {
-                              const departmentName =
-                                event.target.value;
-
-                              const department =
-                                departments.find(
-                                  (item) =>
-                                    item.name === departmentName,
-                                );
-
-                              setContactData((current) => ({
-                                ...current,
-                                departamentoEntrega:
-                                  departmentName,
-                                ciudadEntrega: "",
-                                barrioEntrega: "",
-                              }));
-                            }}
-                            className={`${selectClass} ${
-                              fieldErrors.departamentoEntrega
-                                ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-                                : ""
-                            }`}
-                          >
-                            <option value="">
-                              Selecciona departamento
-                            </option>
-
-                            {departments.map((department) => (
-                              <option
-                                key={department.name}
-                                value={department.name}
-                              >
-                                {department.name}
-                              </option>
-                            ))}
-                          </select>
-
-                          <ChevronDown
-                            size={18}
-                            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-purple-500"
+                          <input
+                            id="direccionEntrega"
+                            type="text"
+                            aria-invalid={Boolean(fieldErrors.direccionEntrega)}
+                            value={
+                              contactData.direccionEntrega
+                            }
+                            onChange={(
+                              event,
+                            ) =>
+                              updateField(
+                                "direccionEntrega",
+                                event.target
+                                  .value,
+                              )
+                            }
+                            placeholder="Ej: Carrera 15 #85-30"
+                            className={`${fieldClass} ${fieldErrors.direccionEntrega
+                              ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                              : ""
+                              }`}
                           />
                         </div>
 
-                        {fieldErrors.departamentoEntrega && (
+                        {fieldErrors.direccionEntrega && (
                           <p className="mt-1.5 text-xs font-semibold text-red-600">
-                            {fieldErrors.departamentoEntrega}
+                            {fieldErrors.direccionEntrega}
                           </p>
                         )}
                       </div>
 
-                      {/* CIUDAD */}
-                      <div>
-                        <label className={labelClass}>
-                          Ciudad{" "}
-                          <span className="text-red-500">*</span>
-                        </label>
+                      <div className="mt-5 grid gap-5 md:grid-cols-3">
+                        {/* DEPARTAMENTO */}
+                        <div>
+                          <label className={labelClass}>
+                            Departamento{" "}
+                            <span className="text-red-500">*</span>
+                          </label>
 
-                        <div className="relative">
-                          <Building2
-                            size={20}
-                            className={iconClass}
-                          />
+                          <div className="relative">
+                            <MapPin
+                              size={20}
+                              className={iconClass}
+                            />
 
-                          <select
-                            id="ciudadEntrega"
-                            aria-invalid={Boolean(fieldErrors.ciudadEntrega)}
-                            value={contactData.ciudadEntrega}
-                            onChange={(event) => {
-                              setContactData((current) => ({
-                                ...current,
-                                ciudadEntrega:
+                            <select
+                              id="departamentoEntrega"
+                              aria-invalid={Boolean(fieldErrors.departamentoEntrega)}
+                              value={contactData.departamentoEntrega}
+                              onChange={(event) => {
+                                const departmentName =
+                                  event.target.value;
+
+                                const department =
+                                  departments.find(
+                                    (item) =>
+                                      item.name === departmentName,
+                                  );
+
+                                setContactData((current) => ({
+                                  ...current,
+                                  departamentoEntrega:
+                                    departmentName,
+                                  ciudadEntrega: "",
+                                  barrioEntrega: "",
+                                }));
+                              }}
+                              className={`${selectClass} ${fieldErrors.departamentoEntrega
+                                ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                                : ""
+                                }`}
+                            >
+                              <option value="">
+                                Selecciona departamento
+                              </option>
+
+                              {departments.map((department) => (
+                                <option
+                                  key={department.name}
+                                  value={department.name}
+                                >
+                                  {department.name}
+                                </option>
+                              ))}
+                            </select>
+
+                            <ChevronDown
+                              size={18}
+                              className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-purple-500"
+                            />
+                          </div>
+
+                          {fieldErrors.departamentoEntrega && (
+                            <p className="mt-1.5 text-xs font-semibold text-red-600">
+                              {fieldErrors.departamentoEntrega}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* CIUDAD */}
+                        <div>
+                          <label className={labelClass}>
+                            Ciudad{" "}
+                            <span className="text-red-500">*</span>
+                          </label>
+
+                          <div className="relative">
+                            <Building2
+                              size={20}
+                              className={iconClass}
+                            />
+
+                            <select
+                              id="ciudadEntrega"
+                              aria-invalid={Boolean(fieldErrors.ciudadEntrega)}
+                              value={contactData.ciudadEntrega}
+                              onChange={(event) => {
+                                setContactData((current) => ({
+                                  ...current,
+                                  ciudadEntrega:
+                                    event.target.value,
+                                  barrioEntrega: "",
+                                }));
+                              }}
+                              className={`${selectClass} ${fieldErrors.ciudadEntrega
+                                ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                                : ""
+                                }`}
+                            >
+                              <option value="">
+                                Selecciona una ciudad
+                              </option>
+
+                              {cities.map((city) => (
+                                <option
+                                  key={city.name}
+                                  value={city.name}
+                                >
+                                  {city.name}
+                                </option>
+                              ))}
+                            </select>
+
+                            <ChevronDown
+                              size={18}
+                              className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-purple-500"
+                            />
+                          </div>
+
+                          {fieldErrors.ciudadEntrega && (
+                            <p className="mt-1.5 text-xs font-semibold text-red-600">
+                              {fieldErrors.ciudadEntrega}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* BARRIO */}
+                        <div>
+                          <label className={labelClass}>
+                            Barrio{" "}
+                            <span className="text-red-500">*</span>
+                          </label>
+
+                          <div className="relative">
+                            <Home
+                              size={20}
+                              className={iconClass}
+                            />
+
+                            <select
+                              id="barrioEntrega"
+                              aria-invalid={Boolean(fieldErrors.barrioEntrega)}
+                              value={contactData.barrioEntrega}
+                              onChange={(event) =>
+                                updateField(
+                                  "barrioEntrega",
                                   event.target.value,
-                                barrioEntrega: "",
-                              }));
-                            }}
-                            className={`${selectClass} ${
-                              fieldErrors.ciudadEntrega
+                                )
+                              }
+                              className={`${selectClass} ${fieldErrors.barrioEntrega
                                 ? "border-red-400 focus:border-red-500 focus:ring-red-100"
                                 : ""
-                            }`}
-                          >
-                            <option value="">
-                              Selecciona una ciudad
-                            </option>
-
-                            {cities.map((city) => (
-                              <option
-                                key={city.name}
-                                value={city.name}
-                              >
-                                {city.name}
+                                }`}
+                            >
+                              <option value="">
+                                Selecciona un barrio
                               </option>
-                            ))}
-                          </select>
 
-                          <ChevronDown
-                            size={18}
-                            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-purple-500"
-                          />
+                              {barrios.map((barrio) => (
+                                <option
+                                  key={barrio}
+                                  value={barrio}
+                                >
+                                  {barrio}
+                                </option>
+                              ))}
+                            </select>
+
+                            <ChevronDown
+                              size={18}
+                              className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-purple-500"
+                            />
+                          </div>
+
+                          {fieldErrors.barrioEntrega && (
+                            <p className="mt-1.5 text-xs font-semibold text-red-600">
+                              {fieldErrors.barrioEntrega}
+                            </p>
+                          )}
                         </div>
-
-                        {fieldErrors.ciudadEntrega && (
-                          <p className="mt-1.5 text-xs font-semibold text-red-600">
-                            {fieldErrors.ciudadEntrega}
-                          </p>
-                        )}
                       </div>
 
-                      {/* BARRIO */}
-                      <div>
+                      {/* HORA DE ENTREGA */}
+                      <div className="mt-5">
                         <label className={labelClass}>
-                          Barrio{" "}
+                          Hora de entrega{" "}
                           <span className="text-red-500">*</span>
                         </label>
 
                         <div className="relative">
-                          <Home
+                          <Clock3
                             size={20}
                             className={iconClass}
                           />
 
                           <select
-                            id="barrioEntrega"
-                            aria-invalid={Boolean(fieldErrors.barrioEntrega)}
-                            value={contactData.barrioEntrega}
+                            value={contactData.horaEntrega}
                             onChange={(event) =>
                               updateField(
-                                "barrioEntrega",
+                                "horaEntrega",
                                 event.target.value,
                               )
                             }
-                            className={`${selectClass} ${
-                              fieldErrors.barrioEntrega
-                                ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-                                : ""
-                            }`}
+                            className={selectClass}
                           >
                             <option value="">
-                              Selecciona un barrio
+                              Selecciona una hora
                             </option>
-
-                            {barrios.map((barrio) => (
-                              <option
-                                key={barrio}
-                                value={barrio}
-                              >
-                                {barrio}
-                              </option>
-                            ))}
+                            <option value="08:00 - 10:00">
+                              08:00 a. m. - 10:00 a. m.
+                            </option>
+                            <option value="10:00 - 12:00">
+                              10:00 a. m. - 12:00 m.
+                            </option>
+                            <option value="12:00 - 14:00">
+                              12:00 m. - 2:00 p. m.
+                            </option>
+                            <option value="14:00 - 16:00">
+                              2:00 p. m. - 4:00 p. m.
+                            </option>
+                            <option value="16:00 - 18:00">
+                              4:00 p. m. - 6:00 p. m.
+                            </option>
                           </select>
 
                           <ChevronDown
@@ -1974,119 +2281,62 @@ export default function NewOrderForm() {
                           />
                         </div>
 
-                        {fieldErrors.barrioEntrega && (
-                          <p className="mt-1.5 text-xs font-semibold text-red-600">
-                            {fieldErrors.barrioEntrega}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* HORA DE ENTREGA */}
-                    <div className="mt-5">
-                      <label className={labelClass}>
-                        Hora de entrega{" "}
-                        <span className="text-red-500">*</span>
-                      </label>
-
-                      <div className="relative">
-                        <Clock3
-                          size={20}
-                          className={iconClass}
-                        />
-
-                        <select
-                          value={contactData.horaEntrega}
-                          onChange={(event) =>
-                            updateField(
-                              "horaEntrega",
-                              event.target.value,
-                            )
-                          }
-                          className={selectClass}
-                        >
-                          <option value="">
-                            Selecciona una hora
-                          </option>
-                          <option value="08:00 - 10:00">
-                            08:00 a. m. - 10:00 a. m.
-                          </option>
-                          <option value="10:00 - 12:00">
-                            10:00 a. m. - 12:00 m.
-                          </option>
-                          <option value="12:00 - 14:00">
-                            12:00 m. - 2:00 p. m.
-                          </option>
-                          <option value="14:00 - 16:00">
-                            2:00 p. m. - 4:00 p. m.
-                          </option>
-                          <option value="16:00 - 18:00">
-                            4:00 p. m. - 6:00 p. m.
-                          </option>
-                        </select>
-
-                        <ChevronDown
-                          size={18}
-                          className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-purple-500"
-                        />
-                      </div>
-
-                      <p className="mt-2 text-xs text-slate-500">
-                        Selecciona una franja aproximada para la entrega.
-                      </p>
-                    </div>
-
-                    {/* TARIFA DE DOMICILIO */}
-                    <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-sm font-black text-purple-950">
-                            Tarifa de domicilio desde Niquía, Bello
-                          </p>
-
-                          <p className="mt-1 text-xs text-slate-600">
-                            {deliveryEstimate.label}. El backend confirmará
-                            el valor definitivo al crear el pedido.
-                          </p>
-                        </div>
-
-                        <p className="text-lg font-black text-amber-700">
-                          {deliveryEstimate.amount !== null
-                            ? formatPrice(deliveryEstimate.amount)
-                            : "Por confirmar"}
+                        <p className="mt-2 text-xs text-slate-500">
+                          Selecciona una franja aproximada para la entrega.
                         </p>
                       </div>
+
+                      {/* TARIFA DE DOMICILIO */}
+                      <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-black text-purple-950">
+                              Tarifa de domicilio desde Niquía, Bello
+                            </p>
+
+                            <p className="mt-1 text-xs text-slate-600">
+                              {deliveryEstimate.label}. El backend confirmará
+                              el valor definitivo al crear el pedido.
+                            </p>
+                          </div>
+
+                          <p className="text-lg font-black text-amber-700">
+                            {deliveryEstimate.amount !== null
+                              ? formatPrice(deliveryEstimate.amount)
+                              : "Por confirmar"}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {metodoEntrega ===
                   "TIENDA" && (
-                  <div className="mt-6 rounded-2xl border border-purple-100 bg-purple-50 p-5">
-                    <div className="flex items-start gap-3">
-                      <Store
-                        size={20}
-                        className="mt-0.5 shrink-0 text-purple-700"
-                      />
+                    <div className="mt-6 rounded-2xl border border-purple-100 bg-purple-50 p-5">
+                      <div className="flex items-start gap-3">
+                        <Store
+                          size={20}
+                          className="mt-0.5 shrink-0 text-purple-700"
+                        />
 
-                      <div>
-                        <p className="font-black text-purple-950">
-                          Recogida en tienda
-                        </p>
+                        <div>
+                          <p className="font-black text-purple-950">
+                            Recogida en tienda
+                          </p>
 
-                        <p className="mt-1 text-sm leading-6 text-slate-500">
-                          No tendrás costo de
-                          envío. Podrás
-                          recoger
-                          personalmente tu
-                          pedido en Aurum
-                          cuando se encuentre
-                          listo.
-                        </p>
+                          <p className="mt-1 text-sm leading-6 text-slate-500">
+                            No tendrás costo de
+                            envío. Podrás
+                            recoger
+                            personalmente tu
+                            pedido en Aurum
+                            cuando se encuentre
+                            listo.
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 <div className="mt-6">
                   <label
@@ -2225,23 +2475,19 @@ export default function NewOrderForm() {
                         enabled: true,
                       },
                       {
-                        value:
-                          "DAVIPLATA" as PaymentMethod,
-                        label:
-                          "Daviplata",
+                        value: "DAVIPLATA" as PaymentMethod,
+                        label: "Daviplata",
                         enabled: false,
                       },
                       {
                         value:
                           "PSE" as PaymentMethod,
                         label: "PSE",
-                        enabled: false,
+                        enabled: true,
                       },
                       {
-                        value:
-                          "TRANSFERENCIA_BANCARIA" as PaymentMethod,
-                        label:
-                          "Transferencia",
+                        value: "TRANSFERENCIA_BANCARIA" as PaymentMethod,
+                        label: "Transferencia",
                         enabled: false,
                       },
                     ].map(
@@ -2261,23 +2507,19 @@ export default function NewOrderForm() {
                             if (
                               enabled
                             ) {
-                              setPaymentMethod(
+                              void handlePaymentMethodChange(
                                 value,
-                              );
-                              setError(
-                                "",
                               );
                             }
                           }}
-                          className={`relative flex min-h-24 flex-col items-center justify-center rounded-2xl border-2 p-4 text-center transition ${
-                            paymentMethod ===
-                              value &&
+                          className={`relative flex min-h-24 flex-col items-center justify-center rounded-2xl border-2 p-4 text-center transition ${paymentMethod ===
+                            value &&
                             enabled
-                              ? "border-purple-700 bg-purple-700 text-white shadow-md"
-                              : enabled
-                                ? "border-purple-100 bg-white text-slate-600 hover:border-purple-300"
-                                : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400 opacity-70"
-                          }`}
+                            ? "border-purple-700 bg-purple-700 text-white shadow-md"
+                            : enabled
+                              ? "border-purple-100 bg-white text-slate-600 hover:border-purple-300"
+                              : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400 opacity-70"
+                            }`}
                         >
                           <CreditCard
                             size={21}
@@ -2326,41 +2568,186 @@ export default function NewOrderForm() {
                     </div>
                   </div>
 
-                  <div className="mt-5 rounded-xl border border-purple-100 bg-white p-4">
-                    <div className="flex items-start gap-3">
-                      <Phone
-                        size={20}
-                        className="mt-0.5 shrink-0 text-purple-700"
-                      />
+                  {paymentMethod === "NEQUI" && (
+                    <div className="mt-5 rounded-xl border border-purple-100 bg-white p-4">
+                      <div className="flex items-start gap-3">
+                        <Phone
+                          size={20}
+                          className="mt-0.5 shrink-0 text-purple-700"
+                        />
 
+                        <div>
+                          <p className="text-sm font-black text-purple-950">
+                            Número Nequi
+                          </p>
+
+                          <p className="mt-1 text-sm text-slate-600">
+                            Se utilizará el teléfono que ingresaste en tus datos:
+                          </p>
+
+                          <p className="mt-2 font-black text-purple-700">
+                            {contactData.telefonoContacto}
+                          </p>
+
+                          <p className="mt-2 text-xs leading-5 text-slate-500">
+                            Debe ser un celular colombiano de 10 dígitos registrado en
+                            Nequi.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {paymentMethod === "PSE" && (
+                    <div className="mt-5 rounded-xl border border-purple-100 bg-white p-4">
                       <div>
                         <p className="text-sm font-black text-purple-950">
-                          Número Nequi
+                          Pago por PSE
                         </p>
 
-                        <p className="mt-1 text-sm text-slate-600">
-                          Se utilizará el
-                          teléfono que
-                          ingresaste en tus
-                          datos:
+                        <p className="mt-1 text-sm leading-6 text-slate-600">
+                          Selecciona tu entidad financiera y completa los
+                          datos requeridos para continuar el pago de forma
+                          segura con Wompi.
                         </p>
+                      </div>
 
-                        <p className="mt-2 font-black text-purple-700">
-                          {
-                            contactData.telefonoContacto
+                      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                        <div className="sm:col-span-2">
+                          <label className={labelClass}>
+                            Entidad financiera
+                          </label>
+
+                          <select
+                            value={pseInstitutionCode}
+                            onChange={(event) =>
+                              setPseInstitutionCode(event.target.value)
+                            }
+                            className={fieldClass}
+                          >
+                            <option value="">
+                              Selecciona una entidad
+                            </option>
+
+                            {pseInstitutions.map((institution) => (
+                              <option
+                                key={institution.financial_institution_code}
+                                value={institution.financial_institution_code}
+                              >
+                                {institution.financial_institution_name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className={labelClass}>
+                            Tipo de persona
+                          </label>
+
+                          <select
+                            value={pseUserType}
+                            onChange={(event) =>
+                              setPseUserType(event.target.value)
+                            }
+                            className={fieldClass}
+                          >
+                            <option value="0">
+                              Persona natural
+                            </option>
+                            <option value="1">
+                              Persona jurídica
+                            </option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className={labelClass}>
+                            Tipo de documento
+                          </label>
+
+                          <select
+                            value={pseDocumentType}
+                            onChange={(event) =>
+                              setPseDocumentType(event.target.value)
+                            }
+                            className={fieldClass}
+                          >
+                            <option value="CC">
+                              Cédula de ciudadanía
+                            </option>
+                            <option value="CE">
+                              Cédula de extranjería
+                            </option>
+                            <option value="NIT">
+                              NIT
+                            </option>
+                            <option value="PP">
+                              Pasaporte
+                            </option>
+                          </select>
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className={labelClass}>
+                            Número de documento
+                          </label>
+
+                          <input
+                            type="text"
+                            value={pseDocumentNumber}
+                            onChange={(event) =>
+                              setPseDocumentNumber(
+                                event.target.value,
+                              )
+                            }
+                            placeholder="Ingresa tu número de documento"
+                            className={fieldClass}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className={labelClass}>
+                          Tipo de cuenta
+                        </label>
+
+                        <select
+                          value={pseAccountType}
+                          onChange={(event) =>
+                            setPseAccountType(event.target.value)
                           }
-                        </p>
+                          className={fieldClass}
+                        >
+                          <option value="AHORROS">Cuenta de ahorros</option>
+                          <option value="CORRIENTE">Cuenta corriente</option>
+                        </select>
+                      </div>
 
-                        <p className="mt-2 text-xs leading-5 text-slate-500">
-                          Debe ser un
-                          celular colombiano
-                          de 10 dígitos
-                          registrado en
-                          Nequi.
+                      <div>
+                        <label className={labelClass}>
+                          Número de cuenta
+                        </label>
+
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={pseAccountNumber}
+                          onChange={(event) =>
+                            setPseAccountNumber(
+                              event.target.value.replace(/\D/g, "").slice(0, 20),
+                            )
+                          }
+                          placeholder="Ej. 12345678901"
+                          className={fieldClass}
+                          autoComplete="off"
+                        />
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          Dato de demostración. AURUM no almacena ni envía este número a Wompi.
                         </p>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {acceptanceLoading && (
                     <div className="mt-5 flex items-center gap-2 rounded-xl border border-purple-100 bg-white px-4 py-3 text-sm font-semibold text-purple-800">
@@ -2491,25 +2878,40 @@ export default function NewOrderForm() {
                     </div>
                   )}
 
-                  {wompiTransaction?.status ===
-                    "PENDING" && (
-                    <div className="mt-5 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">
-                      <p className="font-black">
-                        Solicitud enviada
-                        a Nequi
-                      </p>
+                  {paymentMethod === "NEQUI" &&
+                    wompiTransaction?.status === "PENDING" && (
+                      <div className="mt-5 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">
+                        <p className="font-black">
+                          Solicitud enviada
+                          a Nequi
+                        </p>
 
-                      <p className="mt-1 leading-6">
-                        Abre la aplicación
-                        Nequi en tu celular
-                        y acepta la
-                        solicitud de pago.
-                        Wompi notificará al
-                        backend cuando el
-                        estado cambie.
-                      </p>
-                    </div>
-                  )}
+                        <p className="mt-1 leading-6">
+                          Abre la aplicación
+                          Nequi en tu celular
+                          y acepta la
+                          solicitud de pago.
+                          Wompi notificará al
+                          backend cuando el
+                          estado cambie.
+                        </p>
+                      </div>
+                    )}
+                  {paymentMethod === "NEQUI" &&
+                    wompiTransaction &&
+                    (wompiTransaction.status === "DECLINED" ||
+                      wompiTransaction.status === "VOIDED" ||
+                      wompiTransaction.status === "ERROR") && (
+                      <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                        <p className="font-black">
+                          Pago con Nequi no aprobado
+                        </p>
+
+                        <p className="mt-1 leading-6">
+                          Wompi no aprobó la transacción. Puedes revisar tus datos e intentarlo nuevamente.
+                        </p>
+                      </div>
+                    )}
                 </div>
 
                 <div className="mt-7 flex flex-col justify-between gap-3 border-t border-purple-100 pt-5 sm:flex-row sm:items-center">
@@ -2531,7 +2933,7 @@ export default function NewOrderForm() {
                       paymentLoading ||
                       wompiTransaction
                         ?.status ===
-                        "PENDING"
+                      "PENDING"
                     }
                     className="inline-flex items-center gap-2 text-sm font-bold text-slate-600 transition hover:text-purple-800 disabled:cursor-not-allowed disabled:opacity-40"
                   >
@@ -2574,11 +2976,11 @@ export default function NewOrderForm() {
                         !wompiAcceptance ||
                         !acceptTerms ||
                         !acceptPersonalData ||
-                        paymentMethod !==
-                          "NEQUI" ||
+                        (paymentMethod !== "NEQUI" &&
+                          paymentMethod !== "PSE") ||
                         wompiTransaction
                           ?.status ===
-                          "PENDING"
+                        "PENDING"
                       }
                       className="inline-flex items-center justify-center gap-2 rounded-xl bg-purple-700 px-6 py-3 text-sm font-black text-white shadow-md transition hover:bg-purple-800 disabled:cursor-not-allowed disabled:opacity-50"
                     >
@@ -2590,9 +2992,8 @@ export default function NewOrderForm() {
                           />
                           Procesando...
                         </>
-                      ) : wompiTransaction
-                          ?.status ===
-                        "PENDING" ? (
+                      ) : paymentMethod === "NEQUI" &&
+                        wompiTransaction?.status === "PENDING" ? (
                         <>
                           <Check
                             size={17}
@@ -2604,7 +3005,9 @@ export default function NewOrderForm() {
                           <CreditCard
                             size={17}
                           />
-                          Pagar con Nequi
+                          {paymentMethod === "PSE"
+                            ? "Continuar con PSE"
+                            : "Pagar con Nequi"}
                         </>
                       )}
                     </button>
@@ -2709,7 +3112,7 @@ export default function NewOrderForm() {
 
                   <p className="text-lg font-black text-purple-700">
                     {metodoEntrega === "DOMICILIO" &&
-                    deliveryEstimate.amount === null
+                      deliveryEstimate.amount === null
                       ? formatPrice(cartTotal)
                       : formatPrice(estimatedOrderTotal)}
                   </p>

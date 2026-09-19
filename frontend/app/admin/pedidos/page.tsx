@@ -180,6 +180,8 @@ export default function AdminOrdersPage() {
   const router = useRouter();
 
   const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | "">("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -285,13 +287,13 @@ export default function AdminOrdersPage() {
   }
 
   useEffect(() => {
-  const timer = window.setTimeout(() => {
-    void loadOrders();
-  }, 0);
+    const timer = window.setTimeout(() => {
+      void loadOrders();
+    }, 0);
 
-  return () => window.clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function updateStatus(
     order: AdminOrder,
@@ -369,10 +371,10 @@ export default function AdminOrdersPage() {
         current.map((item) =>
           item.id === order.id
             ? {
-                ...item,
-                ...updated.order,
-                user: item.user,
-              }
+              ...item,
+              ...updated.order,
+              user: item.user,
+            }
             : item,
         ),
       );
@@ -414,6 +416,26 @@ export default function AdminOrdersPage() {
 
     void updateStatus(order, "CANCELADO", reason);
   }
+
+  const normalizedSearch = search.trim().toLowerCase();
+
+  const filteredOrders = orders.filter((order) => {
+    const matchesSearch =
+      !normalizedSearch ||
+      order.numeroPedido.toLowerCase().includes(normalizedSearch) ||
+      order.nombreContacto.toLowerCase().includes(normalizedSearch) ||
+      order.cedulaContacto?.toLowerCase().includes(normalizedSearch) ||
+      order.emailContacto.toLowerCase().includes(normalizedSearch) ||
+      order.telefonoContacto.toLowerCase().includes(normalizedSearch) ||
+      order.user.nombre.toLowerCase().includes(normalizedSearch) ||
+      order.user.apellido.toLowerCase().includes(normalizedSearch) ||
+      order.user.email.toLowerCase().includes(normalizedSearch);
+
+    const matchesStatus =
+      !statusFilter || order.estado === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
 
   if (loading) {
     return (
@@ -465,9 +487,8 @@ export default function AdminOrdersPage() {
               className="flex w-fit items-center gap-2 rounded-xl border border-white/20 px-4 py-2.5 text-sm font-bold transition hover:bg-white/10 disabled:opacity-60"
             >
               <RefreshCw
-                className={`h-4 w-4 ${
-                  refreshing ? "animate-spin" : ""
-                }`}
+                className={`h-4 w-4 ${refreshing ? "animate-spin" : ""
+                  }`}
               />
               {refreshing ? "Actualizando..." : "Actualizar"}
             </button>
@@ -502,16 +523,61 @@ export default function AdminOrdersPage() {
           </p>
         </div>
 
-        {orders.length === 0 ? (
+        <div className="mb-5">
+          <label
+            htmlFor="order-search"
+            className="mb-2 block text-sm font-black text-purple-950"
+          >
+            Buscar pedido
+          </label>
+
+          <input
+            id="order-search"
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Número de pedido, cliente, correo, cédula o teléfono"
+            className="w-full rounded-xl border border-purple-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
+          />
+        </div>
+
+        <div className="mb-5">
+          <label
+            htmlFor="order-status"
+            className="mb-2 block text-sm font-black text-purple-950"
+          >
+            Estado
+          </label>
+
+          <select
+            id="order-status"
+            value={statusFilter}
+            onChange={(event) =>
+              setStatusFilter(event.target.value as OrderStatus | "")
+            }
+            className="w-full rounded-xl border border-purple-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
+          >
+            <option value="">Todos los estados</option>
+            <option value="PENDIENTE">Pendiente</option>
+            <option value="EN_PREPARACION">En preparación</option>
+            <option value="EN_CAMINO">En camino</option>
+            <option value="ENTREGADO">Entregado</option>
+            <option value="CANCELADO">Cancelado</option>
+          </select>
+        </div>
+
+        {filteredOrders.length === 0 ? (
           <div className="rounded-2xl border border-purple-100 bg-white p-10 text-center shadow-sm">
             <Package className="mx-auto h-10 w-10 text-slate-300" />
             <p className="mt-3 font-black text-purple-950">
-              No hay pedidos registrados
+              {orders.length === 0
+                ? "No hay pedidos registrados"
+                : "No hay pedidos que coincidan con la búsqueda o el filtro"}
             </p>
           </div>
         ) : (
           <div className="grid gap-4">
-            {orders.map((order) => {
+            {filteredOrders.map((order) => {
               const expanded = expandedId === order.id;
               const allowedStates =
                 validTransitions[order.estado];

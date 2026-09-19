@@ -51,6 +51,7 @@ export default function GoogleAuthButton({
   const buttonRef = useRef<HTMLDivElement>(null);
   const onCredentialRef = useRef(onCredential);
   const onErrorRef = useRef(onError);
+  const initializedRef = useRef(false);
   const [scriptLoaded, setScriptLoaded] = useState(false);
 
   const clientId =
@@ -77,19 +78,23 @@ export default function GoogleAuthButton({
     const container = buttonRef.current;
     container.innerHTML = "";
 
-    window.google.accounts.id.initialize({
-      client_id: clientId,
-      callback: (response) => {
-        if (!response.credential) {
-          onErrorRef.current?.(
-            "Google no devolviÃ³ una credencial vÃ¡lida.",
-          );
-          return;
-        }
+    if (!initializedRef.current) {
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: (response) => {
+          if (!response.credential) {
+            onErrorRef.current?.(
+              "Google no devolvió una credencial válida.",
+            );
+            return;
+          }
 
-        void onCredentialRef.current(response.credential);
-      },
-    });
+          void onCredentialRef.current(response.credential);
+        },
+      });
+
+      initializedRef.current = true;
+    }
 
     window.google.accounts.id.renderButton(container, {
       type: "standard",
@@ -108,7 +113,7 @@ export default function GoogleAuthButton({
         disabled
         className="flex w-full cursor-not-allowed items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-5 py-2.5 text-sm font-bold text-slate-400"
       >
-        Google no estÃ¡ configurado
+        Google no está configurado
       </button>
     );
   }
@@ -116,12 +121,13 @@ export default function GoogleAuthButton({
   return (
     <>
       <Script
+        id="google-identity-services"
         src="https://accounts.google.com/gsi/client"
         strategy="afterInteractive"
         onReady={() => setScriptLoaded(true)}
         onError={() =>
           onErrorRef.current?.(
-            "No fue posible cargar el inicio de sesiÃ³n con Google.",
+            "No fue posible cargar el inicio de sesión con Google.",
           )
         }
       />
@@ -139,4 +145,3 @@ export default function GoogleAuthButton({
     </>
   );
 }
-

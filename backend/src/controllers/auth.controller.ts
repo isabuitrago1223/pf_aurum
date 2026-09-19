@@ -4,11 +4,12 @@ import bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 
-import { env } from '../config/env.js';
 import { prisma } from '../config/prisma.js';
-import { sendPasswordResetEmail } from '../services/mail.service.js';
+import { env } from '../config/env.js';
 import { AppError } from '../utils/app-error.js';
 import { signAccessToken } from '../utils/jwt.js';
+import { sendPasswordResetEmail } from '../services/mail.service.js';
+import { verifyGoogleIdToken } from '../services/google-auth.service.js';
 
 const password = z
   .string()
@@ -33,6 +34,13 @@ const registerSchema = z.object({
   acceptedTerms: z.literal(true),
   acceptedPrivacy: z.literal(true),
   acceptedDataPolicy: z.literal(true)
+});
+
+const googleLoginSchema = z.object({
+  credential: z.string().trim().min(1),
+  acceptedTerms: z.boolean().optional(),
+  acceptedPrivacy: z.boolean().optional(),
+  acceptedDataPolicy: z.boolean().optional()
 });
 
 const forgotPasswordSchema = z.object({
@@ -67,17 +75,21 @@ export async function register(req: Request, res: Response) {
 
   const {
     password: rawPassword,
-    acceptedTerms: _terms,
-    acceptedPrivacy: _privacy,
+    acceptedTerms,
+    acceptedPrivacy,
     acceptedDataPolicy: _dataPolicy,
     ...userData
   } = data;
+
+  const acceptedAt = new Date();
 
   const user = await prisma.user.create({
     data: {
       ...userData,
       passwordHash: await bcrypt.hash(rawPassword, 12),
-      role: 'CLIENTE'
+      role: 'CLIENTE',
+      acceptedTermsAt: acceptedTerms ? acceptedAt : null,
+      acceptedPrivacyAt: acceptedPrivacy ? acceptedAt : null
     }
   });
 
@@ -123,6 +135,159 @@ export async function login(req: Request, res: Response) {
     );
   }
 
+  if (user.estado === 'SUSPENDIDO') {
+    throw new AppError(
+      403,
+      'La cuenta se encuentra suspendida.'
+    );
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: {
+      id: user.id
+    },
+    data: {
+      lastLoginAt: new Date()
+    }
+  });
+
+  const token = signAccessToken({
+    sub: updatedUser.id,
+    role: updatedUser.role
+  });
+
+  res.json({
+    token,
+    user: {
+      id: updatedUser.id,
+      nombre: updatedUser.nombre,
+      email: updatedUser.email,
+      role: updatedUser.role
+    }
+  });
+}
+
+export async function googleLogin(
+  req: Request,
+  res: Response
+) {
+  const {
+    credential,
+    acceptedTerms,
+    acceptedPrivacy,
+    acceptedDataPolicy
+  } = googleLoginSchema.parse(req.body);
+
+  const googleProfile =
+    await verifyGoogleIdToken(credential);
+
+  let user = await prisma.user.findUnique({
+    where: {
+      googleId: googleProfile.googleId
+    }
+  });
+
+  if (user) {
+    if (user.role !== 'CLIENTE') {
+      throw new AppError(
+        403,
+        'El inicio de sesion con Google esta disponible solo para clientes.'
+      );
+    }
+
+    if (user.estado === 'SUSPENDIDO') {
+      throw new AppError(
+        403,
+        'La cuenta se encuentra suspendida.'
+      );
+    }
+
+    user = await prisma.user.update({
+      where: {
+        id: user.id
+      },
+      data: {
+        lastLoginAt: new Date()
+      }
+    });
+  } else {
+    const userWithSameEmail =
+      await prisma.user.findUnique({
+        where: {
+          email: googleProfile.email
+        }
+      });
+
+    if (userWithSameEmail) {
+      if (userWithSameEmail.role !== 'CLIENTE') {
+        throw new AppError(
+          403,
+          'El inicio de sesion con Google esta disponible solo para clientes.'
+        );
+      }
+
+      if (userWithSameEmail.estado === 'SUSPENDIDO') {
+        throw new AppError(
+          403,
+          'La cuenta se encuentra suspendida.'
+        );
+      }
+
+      if (
+        userWithSameEmail.googleId &&
+        userWithSameEmail.googleId !==
+          googleProfile.googleId
+      ) {
+        throw new AppError(
+          409,
+          'El correo ya esta vinculado a otra cuenta de Google.'
+        );
+      }
+
+      user = await prisma.user.update({
+        where: {
+          id: userWithSameEmail.id
+        },
+        data: {
+          googleId: googleProfile.googleId,
+          emailVerifiedAt:
+            userWithSameEmail.emailVerifiedAt ??
+            new Date(),
+          lastLoginAt: new Date()
+        }
+      });
+    } else {
+      if (
+        acceptedTerms !== true ||
+        acceptedPrivacy !== true ||
+        acceptedDataPolicy !== true
+      ) {
+        throw new AppError(
+          400,
+          'Debes aceptar los terminos, la politica de privacidad y la politica de tratamiento de datos para crear una cuenta.'
+        );
+      }
+
+      const acceptedAt = new Date();
+
+      user = await prisma.user.create({
+        data: {
+          nombre: googleProfile.nombre,
+          apellido: googleProfile.apellido,
+          email: googleProfile.email,
+          googleId: googleProfile.googleId,
+          authProvider: 'GOOGLE',
+          role: 'CLIENTE',
+          estado: 'ACTIVO',
+          emailVerifiedAt: acceptedAt,
+          acceptedTermsAt: acceptedAt,
+          acceptedPrivacyAt: acceptedAt,
+          lastLoginAt: acceptedAt
+        }
+      });
+    }
+  }
+
   const token = signAccessToken({
     sub: user.id,
     role: user.role
@@ -150,8 +315,8 @@ export async function forgotPassword(
   });
 
   /*
-   * Siempre devolvemos la misma respuesta para evitar
-   * revelar si un correo esta registrado.
+   * Siempre devolvemos la misma respuesta.
+   * Esto evita revelar si un correo esta registrado.
    */
   if (!user || !user.passwordHash) {
     res.json(forgotPasswordResponse);
@@ -169,8 +334,8 @@ export async function forgotPassword(
   );
 
   /*
-   * Invalidamos tokens anteriores sin utilizar.
-   * Solo el enlace mas reciente debe permanecer valido.
+   * Invalidamos tokens anteriores sin utilizar
+   * para que solamente el enlace mas reciente sea valido.
    */
   await prisma.passwordResetToken.updateMany({
     where: {
@@ -250,8 +415,8 @@ export async function resetPassword(
     });
 
     /*
-     * Una vez cambiada la contrasena invalidamos todos
-     * los tokens de recuperacion pendientes del usuario.
+     * Al cambiar la contrasena invalidamos todos los
+     * tokens pendientes de recuperacion de este usuario.
      */
     await tx.passwordResetToken.updateMany({
       where: {
