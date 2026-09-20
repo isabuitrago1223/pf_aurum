@@ -30,6 +30,11 @@ type ErrorResponse = {
   error?: string;
 };
 
+type FieldErrors = {
+  email?: string;
+  password?: string;
+};
+
 export default function LoginPage() {
   const router = useRouter();
 
@@ -37,6 +42,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] =
+    useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -56,12 +63,43 @@ export default function LoginPage() {
 
     router.refresh();
   }
+
+  function validateLoginForm() {
+    const errors: FieldErrors = {};
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail) {
+      errors.email = "Ingresa tu correo electrónico.";
+    } else {
+      const emailPattern =
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      if (!emailPattern.test(cleanEmail)) {
+        errors.email =
+          "Ingresa un correo electrónico válido.";
+      }
+    }
+
+    if (!password) {
+      errors.password = "Ingresa tu contraseña.";
+    }
+
+    setFieldErrors(errors);
+
+    return Object.keys(errors).length === 0;
+  }
+
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
 
     setError("");
+
+    if (!validateLoginForm()) {
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -77,7 +115,7 @@ export default function LoginPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            email,
+            email: email.trim(),
             password,
           }),
         },
@@ -143,8 +181,8 @@ export default function LoginPage() {
         if (response.status === 403) {
           setError(
             errorData.message ??
-            errorData.error ??
-            "Tu cuenta no tiene permitido iniciar sesión con Google.",
+              errorData.error ??
+              "Tu cuenta no tiene permitido iniciar sesión con Google.",
           );
           return;
         }
@@ -152,8 +190,8 @@ export default function LoginPage() {
         if (response.status === 409) {
           setError(
             errorData.message ??
-            errorData.error ??
-            "Este correo ya está vinculado a otra cuenta de Google.",
+              errorData.error ??
+              "Este correo ya está vinculado a otra cuenta de Google.",
           );
           return;
         }
@@ -174,8 +212,8 @@ export default function LoginPage() {
 
         setError(
           errorData.message ??
-          errorData.error ??
-          "No fue posible iniciar sesión con Google.",
+            errorData.error ??
+            "No fue posible iniciar sesión con Google.",
         );
         return;
       }
@@ -265,6 +303,7 @@ export default function LoginPage() {
           <form
             className="space-y-4"
             onSubmit={handleSubmit}
+            noValidate
           >
             {/* Correo */}
             <div>
@@ -285,14 +324,39 @@ export default function LoginPage() {
                   autoComplete="email"
                   placeholder="ejemplo@correo.com"
                   value={email}
-                  onChange={(event) =>
-                    setEmail(event.target.value)
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+
+                    if (fieldErrors.email) {
+                      setFieldErrors((current) => ({
+                        ...current,
+                        email: undefined,
+                      }));
+                    }
+                  }}
+                  aria-invalid={Boolean(fieldErrors.email)}
+                  aria-describedby={
+                    fieldErrors.email
+                      ? "email-error"
+                      : undefined
                   }
-                  required
                   disabled={loading || googleLoading}
-                  className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className={`w-full rounded-xl bg-white py-2.5 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-4 disabled:cursor-not-allowed disabled:opacity-60 ${
+                    fieldErrors.email
+                      ? "border border-red-300 focus:border-red-400 focus:ring-red-100"
+                      : "border border-purple-200 focus:border-purple-500 focus:ring-purple-100"
+                  }`}
                 />
               </div>
+
+              {fieldErrors.email && (
+                <p
+                  id="email-error"
+                  className="mt-1.5 text-xs font-semibold text-red-600"
+                >
+                  {fieldErrors.email}
+                </p>
+              )}
             </div>
 
             {/* Contraseña */}
@@ -318,12 +382,30 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   placeholder="••••••••"
                   value={password}
-                  onChange={(event) =>
-                    setPassword(event.target.value)
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+
+                    if (fieldErrors.password) {
+                      setFieldErrors((current) => ({
+                        ...current,
+                        password: undefined,
+                      }));
+                    }
+                  }}
+                  aria-invalid={Boolean(
+                    fieldErrors.password,
+                  )}
+                  aria-describedby={
+                    fieldErrors.password
+                      ? "password-error"
+                      : undefined
                   }
-                  required
                   disabled={loading || googleLoading}
-                  className="w-full rounded-xl border border-purple-200 bg-white py-2.5 pl-11 pr-11 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className={`w-full rounded-xl bg-white py-2.5 pl-11 pr-11 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-4 disabled:cursor-not-allowed disabled:opacity-60 ${
+                    fieldErrors.password
+                      ? "border border-red-300 focus:border-red-400 focus:ring-red-100"
+                      : "border border-purple-200 focus:border-purple-500 focus:ring-purple-100"
+                  }`}
                 />
 
                 <button
@@ -348,6 +430,15 @@ export default function LoginPage() {
                   )}
                 </button>
               </div>
+
+              {fieldErrors.password && (
+                <p
+                  id="password-error"
+                  className="mt-1.5 text-xs font-semibold text-red-600"
+                >
+                  {fieldErrors.password}
+                </p>
+              )}
             </div>
 
             {/* Recuperar contraseña */}

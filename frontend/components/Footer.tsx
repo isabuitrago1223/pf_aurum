@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  MapPin,
-  Sparkles,
-  Star,
-  X,
-} from "lucide-react";
+import { MapPin, Sparkles, Star, X } from "lucide-react";
 
 type ModalType =
   | "nosotros"
@@ -23,21 +18,21 @@ const testimonios = [
     texto:
       "El desayuno sorpresa para el cumpleaños de mi mamá estuvo sencillamente espectacular. Las frutas súper frescas, los waffles calienticos y la decoración en morado y dorado preciosa.",
     nombre: "Camila Rodríguez",
-    ciudad: "Bogotá",
+    ciudad: "Medellín",
     ocasion: "Cumpleaños",
   },
   {
     texto:
       "La ancheta gourmet con vino llegó exactamente a la hora programada en mi aniversario. Mi esposo quedó fascinado con la presentación elegante.",
     nombre: "Felipe Mendoza",
-    ciudad: "Chía",
+    ciudad: "Bello",
     ocasion: "Aniversario",
   },
   {
     texto:
       "La atención fue excelente y todo llegó tal como lo esperaba. Los detalles quedaron hermosos y la presentación fue impecable.",
     nombre: "Valeria Santos",
-    ciudad: "Bogotá",
+    ciudad: "Medellín",
     ocasion: "Graduación",
   },
 ];
@@ -75,8 +70,8 @@ export default function Footer() {
             </h2>
 
             <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-              La confianza y felicidad de nuestros clientes es
-              nuestra mayor satisfacción.
+              La confianza y felicidad de nuestros clientes es nuestra mayor
+              satisfacción.
             </p>
           </div>
 
@@ -148,7 +143,7 @@ export default function Footer() {
               <MapPin className="h-4 w-4 text-amber-300" />
 
               <span>
-                Avenida 39A #62-42, Bogotá
+                Avenida 39A #62-42, Niquía, Bello, Antioquia
               </span>
             </div>
           </div>
@@ -288,9 +283,7 @@ export default function Footer() {
   );
 }
 
-function getModalTitle(
-  type: Exclude<ModalType, null>,
-) {
+function getModalTitle(type: Exclude<ModalType, null>) {
   const titles = {
     nosotros: "Acerca de Nosotros",
     equipo: "Integrantes del Equipo",
@@ -317,10 +310,9 @@ function ModalContent({
         </h3>
 
         <p>
-          Aurum Decoraciones nace con el propósito de transformar
-          fechas especiales en experiencias memorables mediante
-          regalos, desayunos, flores, anchetas y detalles
-          personalizados.
+          Aurum Decoraciones nace con el propósito de transformar fechas
+          especiales en experiencias memorables mediante regalos, desayunos,
+          flores, anchetas y detalles personalizados.
         </p>
 
         <h3 className="font-serif text-lg font-black text-purple-950">
@@ -328,8 +320,8 @@ function ModalContent({
         </h3>
 
         <p>
-          Crear experiencias únicas a través de detalles preparados
-          con dedicación, creatividad y atención personalizada.
+          Crear experiencias únicas a través de detalles preparados con
+          dedicación, creatividad y atención personalizada.
         </p>
       </div>
     );
@@ -360,9 +352,9 @@ function ModalContent({
     return (
       <div className="space-y-5">
         <p>
-          Al utilizar Aurum Decoraciones, el usuario acepta las
-          condiciones aplicables al uso de la plataforma, registro,
-          pedidos y servicios ofrecidos.
+          Al utilizar Aurum Decoraciones, el usuario acepta las condiciones
+          aplicables al uso de la plataforma, registro, pedidos y servicios
+          ofrecidos.
         </p>
 
         <h3 className="font-bold text-purple-950">
@@ -370,9 +362,9 @@ function ModalContent({
         </h3>
 
         <p>
-          El cliente debe verificar que los productos, cantidades,
-          datos de entrega y personalizaciones sean correctos antes
-          de confirmar un pedido.
+          El cliente debe verificar que los productos, cantidades, datos de
+          entrega y personalizaciones sean correctos antes de confirmar un
+          pedido.
         </p>
 
         <h3 className="font-bold text-purple-950">
@@ -380,9 +372,8 @@ function ModalContent({
         </h3>
 
         <p>
-          Los productos y tiempos de entrega están sujetos a
-          disponibilidad de inventario y condiciones informadas al
-          momento de realizar el pedido.
+          Los productos y tiempos de entrega están sujetos a disponibilidad de
+          inventario y condiciones informadas al momento de realizar el pedido.
         </p>
 
         <h3 className="font-bold text-purple-950">
@@ -390,8 +381,8 @@ function ModalContent({
         </h3>
 
         <p>
-          Los productos personalizados se elaboran de acuerdo con la
-          información suministrada por el cliente.
+          Los productos personalizados se elaboran de acuerdo con la información
+          suministrada por el cliente.
         </p>
       </div>
     );
@@ -401,15 +392,14 @@ function ModalContent({
     return (
       <div className="space-y-5">
         <p>
-          Aurum Decoraciones utiliza los datos proporcionados por los
-          usuarios para gestionar cuentas, pedidos, entregas y
-          atención relacionada con el servicio.
+          Aurum Decoraciones utiliza los datos proporcionados por los usuarios
+          para gestionar cuentas, pedidos, entregas y atención relacionada con
+          el servicio.
         </p>
 
         <p>
-          La información personal debe ser tratada únicamente para
-          las finalidades necesarias para el funcionamiento de la
-          plataforma.
+          La información personal debe ser tratada únicamente para las
+          finalidades necesarias para el funcionamiento de la plataforma.
         </p>
       </div>
     );
@@ -419,9 +409,8 @@ function ModalContent({
     return (
       <div className="space-y-5">
         <p>
-          Aurum Decoraciones aplica mecanismos de autenticación y
-          control de acceso para proteger las funciones privadas de
-          la plataforma.
+          Aurum Decoraciones aplica mecanismos de autenticación y control de
+          acceso para proteger las funciones privadas de la plataforma.
         </p>
 
         <p>
@@ -430,8 +419,8 @@ function ModalContent({
         </p>
 
         <p>
-          Las operaciones administrativas están restringidas a
-          usuarios con los permisos correspondientes.
+          Las operaciones administrativas están restringidas a usuarios con los
+          permisos correspondientes.
         </p>
       </div>
     );
@@ -470,9 +459,9 @@ function ModalContent({
       </h3>
 
       <p>
-        Si necesitas ayuda con un producto, personalización, pedido o
-        entrega, puedes comunicarte con Aurum Decoraciones mediante
-        los canales de atención habilitados por la tienda.
+        Si necesitas ayuda con un producto, personalización, pedido o entrega,
+        puedes comunicarte con Aurum Decoraciones mediante los canales de
+        atención habilitados por la tienda.
       </p>
 
       <div className="rounded-2xl bg-purple-50 p-5">
@@ -481,7 +470,7 @@ function ModalContent({
         </p>
 
         <p className="mt-2">
-          Avenida 39A #62-42, Bogotá
+          Avenida 39A #62-42, Niquía, Bello, Antioquia
         </p>
       </div>
     </div>

@@ -9,7 +9,10 @@ import {
   resetPassword
 } from '../controllers/auth.controller.js';
 import { asyncHandler } from '../middlewares/async-handler.middleware.js';
-import { requireAuth, requireRole } from '../middlewares/auth.middleware.js';
+import {
+  requireAuth,
+  requireRole
+} from '../middlewares/auth.middleware.js';
 
 export const authRouter = Router();
 
@@ -19,7 +22,8 @@ const loginRateLimit = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: {
-    message: 'Demasiados intentos de inicio de sesion. Intenta nuevamente mas tarde.'
+    message:
+      'Demasiados intentos de inicio de sesion. Intenta nuevamente mas tarde.'
   }
 });
 
@@ -29,7 +33,8 @@ const passwordRecoveryRateLimit = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: {
-    message: 'Demasiados intentos de recuperacion. Intenta nuevamente mas tarde.'
+    message:
+      'Demasiados intentos de recuperacion. Intenta nuevamente mas tarde.'
   }
 });
 

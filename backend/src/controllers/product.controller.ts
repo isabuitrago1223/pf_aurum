@@ -395,7 +395,12 @@ export async function getAdminProducts(
     },
     include: {
       category: true,
-      occasion: true
+      occasion: true,
+      images: {
+        orderBy: {
+          orden: 'asc'
+        }
+      }
     }
   });
 
