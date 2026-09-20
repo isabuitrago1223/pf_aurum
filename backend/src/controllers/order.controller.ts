@@ -480,7 +480,12 @@ export async function updateOrderStatus(
       id: orderId
     },
     include: {
-      items: true
+      items: true,
+      payments: {
+        select: {
+          estado: true
+        }
+      }
     }
   });
 
@@ -505,6 +510,18 @@ export async function updateOrderStatus(
     throw new AppError(
       409,
       'No es posible cancelar un pedido entregado.'
+    );
+  }
+
+  if (
+    data.estado === 'CANCELADO' &&
+    order.payments.some(
+      (payment) => payment.estado === 'APROBADO'
+    )
+  ) {
+    throw new AppError(
+      409,
+      'No es posible cancelar un pedido con un pago aprobado. El pago debe ser reembolsado antes de cancelar el pedido.'
     );
   }
 
