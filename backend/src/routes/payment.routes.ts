@@ -122,12 +122,63 @@ paymentRouter.get(
   asyncHandler(getWompiAcceptanceData)
 );
 
+/**
+ * @openapi
+ * /api/payments/wompi/pse/institutions:
+ *   get:
+ *     tags:
+ *       - Pagos
+ *       - Wompi
+ *     summary: Obtener instituciones financieras disponibles para PSE
+ *     description: Retorna la lista de instituciones financieras disponibles en Wompi para realizar pagos mediante PSE. Requiere un cliente autenticado.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Instituciones financieras de PSE obtenidas correctamente.
+ *       401:
+ *         description: Autenticación requerida o sesión inválida.
+ *       403:
+ *         description: El usuario no tiene rol CLIENTE.
+ */
+
 paymentRouter.get(
   '/wompi/pse/institutions',
   requireAuth,
   requireRole('CLIENTE'),
   asyncHandler(getWompiPseInstitutions)
 );
+
+/**
+ * @openapi
+ * /api/payments/wompi/{transactionId}/status:
+ *   get:
+ *     tags:
+ *       - Pagos
+ *       - Wompi
+ *     summary: Consultar el estado de una transacción de Wompi
+ *     description: Consulta en Wompi el estado actualizado de una transacción asociada a un pedido del cliente autenticado.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: transactionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Identificador de la transacción generado por Wompi.
+ *     responses:
+ *       200:
+ *         description: Estado de la transacción consultado correctamente.
+ *       401:
+ *         description: Autenticación requerida o sesión inválida.
+ *       403:
+ *         description: El usuario no tiene rol CLIENTE o no puede consultar esta transacción.
+ *       404:
+ *         description: Pago o transacción no encontrada.
+ *       409:
+ *         description: La referencia o el monto de Wompi no coincide con el pago registrado.
+ */
 
 paymentRouter.get(
   '/wompi/:transactionId/status',

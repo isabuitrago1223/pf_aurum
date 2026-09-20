@@ -76,14 +76,9 @@ export async function sendPasswordResetEmail({
 }: SendPasswordResetEmailInput) {
   const transporter = getTransporter();
 
-  if (!transporter || !env.SMTP_FROM) {
-    if (env.NODE_ENV !== 'production') {
-      console.log(`[DEV] Enlace de recuperacion para ${to}: ${resetUrl}`);
-      return;
-    }
-
-    throw new Error('El servicio de correo no esta configurado.');
-  }
+if (!transporter || !env.SMTP_FROM) {
+  throw new Error('El servicio de correo no esta configurado.');
+}
 
   await transporter.sendMail({
     from: env.SMTP_FROM,
