@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "tsc && node --watch dist/server.js",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "node dist/server.js",
     "lint": "tsc --noEmit",
     "prisma:generate": "prisma generate",
