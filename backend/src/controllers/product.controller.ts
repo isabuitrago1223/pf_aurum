@@ -224,7 +224,25 @@ export async function createProduct(req: Request, res: Response) {
   });
 }
 
-const updateProductSchema = createProductSchema.partial();
+// Los productos nuevos continúan exigiendo una URL completa.
+// Al editar, también se aceptan temporalmente las rutas internas
+// de productos antiguos creados por el seed.
+// Las imágenes nuevas cargadas desde administración siguen usando Cloudinary.
+const updateProductSchema = createProductSchema
+  .extend({
+    imagen: z
+      .string()
+      .max(500)
+      .refine(
+        (value) =>
+          value.startsWith('/') ||
+          z.string().url().safeParse(value).success,
+        {
+          message: 'La imagen debe ser una URL válida o una ruta interna.'
+        }
+      )
+  })
+  .partial();
 
 export async function updateProduct(req: Request, res: Response) {
   const idParam = req.params.id;
