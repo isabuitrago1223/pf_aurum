@@ -7,141 +7,123 @@ export async function getAdminDashboard(
   _req: AuthenticatedRequest,
   res: Response
 ) {
-  const [
-    totalClientes,
-    clientesActivos,
-    clientesSuspendidos,
-    clientesPendientes,
-    totalProductos,
-    productosActivos,
-    productos,
-    totalPedidos,
-    pedidosPendientes,
-    pedidosEnPreparacion,
-    pedidosEnCamino,
-    pedidosEntregados,
-    pedidosCancelados,
-    ventasAprobadas,
-    ultimosPedidos
-  ] = await Promise.all([
-    prisma.user.count({
-      where: {
-        role: 'CLIENTE'
-      }
-    }),
+  const totalClientes = await prisma.user.count({
+    where: {
+      role: 'CLIENTE'
+    }
+  });
 
-    prisma.user.count({
-      where: {
-        role: 'CLIENTE',
-        estado: 'ACTIVO'
-      }
-    }),
+  const clientesActivos = await prisma.user.count({
+    where: {
+      role: 'CLIENTE',
+      estado: 'ACTIVO'
+    }
+  });
 
-    prisma.user.count({
-      where: {
-        role: 'CLIENTE',
-        estado: 'SUSPENDIDO'
-      }
-    }),
+  const clientesSuspendidos = await prisma.user.count({
+    where: {
+      role: 'CLIENTE',
+      estado: 'SUSPENDIDO'
+    }
+  });
 
-    prisma.user.count({
-      where: {
-        role: 'CLIENTE',
-        estado: 'PENDIENTE_VERIFICACION'
-      }
-    }),
+  const clientesPendientes = await prisma.user.count({
+    where: {
+      role: 'CLIENTE',
+      estado: 'PENDIENTE_VERIFICACION'
+    }
+  });
 
-    prisma.product.count(),
+  const totalProductos = await prisma.product.count();
 
-    prisma.product.count({
-      where: {
-        activo: true
-      }
-    }),
+  const productosActivos = await prisma.product.count({
+    where: {
+      activo: true
+    }
+  });
 
-    prisma.product.findMany({
-      where: {
-        activo: true
-      },
-      select: {
-        id: true,
-        sku: true,
-        nombre: true,
-        stock: true,
-        stockMinimo: true
-      },
-      orderBy: {
-        stock: 'asc'
-      }
-    }),
+  const productos = await prisma.product.findMany({
+    where: {
+      activo: true
+    },
+    select: {
+      id: true,
+      sku: true,
+      nombre: true,
+      stock: true,
+      stockMinimo: true
+    },
+    orderBy: {
+      stock: 'asc'
+    }
+  });
 
-    prisma.order.count(),
+  const totalPedidos = await prisma.order.count();
 
-    prisma.order.count({
-      where: {
-        estado: 'PENDIENTE'
-      }
-    }),
+  const pedidosPendientes = await prisma.order.count({
+    where: {
+      estado: 'PENDIENTE'
+    }
+  });
 
-    prisma.order.count({
-      where: {
-        estado: 'EN_PREPARACION'
-      }
-    }),
+  const pedidosEnPreparacion = await prisma.order.count({
+    where: {
+      estado: 'EN_PREPARACION'
+    }
+  });
 
-    prisma.order.count({
-      where: {
-        estado: 'EN_CAMINO'
-      }
-    }),
+  const pedidosEnCamino = await prisma.order.count({
+    where: {
+      estado: 'EN_CAMINO'
+    }
+  });
 
-    prisma.order.count({
-      where: {
-        estado: 'ENTREGADO'
-      }
-    }),
+  const pedidosEntregados = await prisma.order.count({
+    where: {
+      estado: 'ENTREGADO'
+    }
+  });
 
-    prisma.order.count({
-      where: {
-        estado: 'CANCELADO'
-      }
-    }),
+  const pedidosCancelados = await prisma.order.count({
+    where: {
+      estado: 'CANCELADO'
+    }
+  });
 
-    prisma.payment.aggregate({
-      where: {
-        estado: 'APROBADO'
-      },
-      _sum: {
-        monto: true
-      },
-      _count: {
-        id: true
-      }
-    }),
+  const ventasAprobadas = await prisma.payment.aggregate({
+    where: {
+      estado: 'APROBADO'
+    },
+    _sum: {
+      monto: true
+    },
+    _count: {
+      id: true
+    }
+  });
 
-    prisma.order.findMany({
-      take: 5,
-      orderBy: {
-        createdAt: 'desc'
-      },
-      select: {
-        id: true,
-        numeroPedido: true,
-        estado: true,
-        metodoEntrega: true,
-        total: true,
-        createdAt: true,
-        user: {
-          select: {
-            id: true,
-            nombre: true,
-            apellido: true,
-            email: true
-          }
+  const ultimosPedidos = await prisma.order.findMany({
+    take: 5,
+    orderBy: {
+      createdAt: 'desc'
+    },
+    select: {
+      id: true,
+      numeroPedido: true,
+      estado: true,
+      metodoEntrega: true,
+      total: true,
+      createdAt: true,
+      user: {
+        select: {
+          id: true,
+          nombre: true,
+          apellido: true,
+          email: true
         }
       }
-    })
-  ]);
+    }
+  });
 
   const productosStockBajo = productos.filter(
     (producto) => producto.stock <= producto.stockMinimo
@@ -155,13 +137,11 @@ export async function getAdminDashboard(
         suspendidos: clientesSuspendidos,
         pendientesVerificacion: clientesPendientes
       },
-
       productos: {
         total: totalProductos,
         activos: productosActivos,
         stockBajo: productosStockBajo.length
       },
-
       pedidos: {
         total: totalPedidos,
         pendientes: pedidosPendientes,
@@ -170,7 +150,6 @@ export async function getAdminDashboard(
         entregados: pedidosEntregados,
         cancelados: pedidosCancelados
       },
-
       ventas: {
         pagosAprobados: ventasAprobadas._count.id,
         totalAprobado: Number(
@@ -178,11 +157,9 @@ export async function getAdminDashboard(
         )
       }
     },
-
     alertas: {
       productosStockBajo
     },
-
     ultimosPedidos
   });
 }
